@@ -41,6 +41,7 @@ class TypeValue(models.Model):
     id = fields.IntField(primary_key=True)
     type_value = fields.CharField(max_length=128, null=True)
     for_mobile = fields.BooleanField()
+    description = fields.CharField()
 
     class Meta:
         schema = "s_gazifikacia"
