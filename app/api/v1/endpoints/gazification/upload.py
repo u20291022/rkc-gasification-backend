@@ -38,25 +38,25 @@ async def upload_gazification_data(request: GazificationUploadRequest):
             
         address = await address_query.first()
         
-        if not address:
-            # Создаем новый адрес, если он не существует
-            address = await AddressV2.create(
-                id_mo=request.address.mo_id,
-                district=request.address.district,
-                street=request.address.street,
-                house=request.address.house,
-                flat=request.address.flat
-            )
-            log_db_operation("create", "AddressV2", {
-                "address_id": address.id,
-                "mo_id": request.address.mo_id,
-                "district": request.address.district,
-                "street": request.address.street,
-                "house": request.address.house,
-                "flat": request.address.flat
-            })
+        async with in_transaction() as conn:
+            if not address:
+                # Создаем новый адрес, если он не существует
+                address = await AddressV2.create(
+                    id_mo=request.address.mo_id,
+                    district=request.address.district,
+                    street=request.address.street,
+                    house=request.address.house,
+                    flat=request.address.flat
+                )
+                log_db_operation("create", "AddressV2", {
+                    "address_id": address.id,
+                    "mo_id": request.address.mo_id,
+                    "district": request.address.district,
+                    "street": request.address.street,
+                    "house": request.address.house,
+                    "flat": request.address.flat
+                })
         
-        async with in_transaction() as conn:            # Добавляем данные газификации
             for field in request.fields:
                 type_value = await TypeValue.get(id=field.id)
                 await GazificationData.create(

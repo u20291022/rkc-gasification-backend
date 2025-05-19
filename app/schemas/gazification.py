@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import Optional, List
 
 # Схемы для работы с API газификации
 
@@ -11,27 +10,27 @@ class MunicipalityModel(BaseModel):
 
 class MOListResponse(BaseModel):
     """Ответ со списком муниципалитетов"""
-    mos: List[MunicipalityModel]
+    mos: list[MunicipalityModel]
 
 
 class DistrictListResponse(BaseModel):
     """Ответ со списком районов"""
-    districts: List[str]
+    districts: list[str]
 
 
 class StreetListResponse(BaseModel):
     """Ответ со списком улиц"""
-    streets: List[str]
+    streets: list[str]
 
 
 class HouseListResponse(BaseModel):
     """Ответ со списком домов"""
-    houses: List[str]
+    houses: list[str]
 
 
 class FlatListResponse(BaseModel):
     """Ответ со списком квартир"""
-    flats: List[str]
+    flats: list[str]
 
 
 class TypeValueModel(BaseModel):
@@ -42,7 +41,7 @@ class TypeValueModel(BaseModel):
 
 class TypeValuesResponse(BaseModel):
     """Ответ со списком типов значений"""
-    type_values: List[TypeValueModel]
+    type_values: list[TypeValueModel]
 
 
 class AddressCreateRequest(BaseModel):
@@ -51,7 +50,7 @@ class AddressCreateRequest(BaseModel):
     district: str
     street: str
     house: str
-    flat: Optional[str] = None
+    flat: str | None = None
     has_gas: bool
 
 
@@ -61,7 +60,7 @@ class AddressModel(BaseModel):
     district: str
     street: str
     house: str
-    flat: Optional[str] = None
+    flat: str | None = None
 
 
 class FieldModel(BaseModel):
@@ -73,4 +72,4 @@ class FieldModel(BaseModel):
 class GazificationUploadRequest(BaseModel):
     """Запрос на отправку записи"""
     address: AddressModel
-    fields: List[FieldModel]
+    fields: list[FieldModel]

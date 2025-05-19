@@ -5,13 +5,9 @@ from app.schemas.gazification import StreetListResponse
 from app.models.models import AddressV2
 from app.core.exceptions import DatabaseError
 from tortoise.functions import Lower
-from tortoise.expressions import Function
+from tortoise.functions import Trim
 
 router = APIRouter()
-
-class Trim(Function):
-    """Функция для удаления пробелов в SQL запросе"""
-    database_func = "TRIM"
 
 @router.get("/mo/{mo_id}/district/{district}/street", response_model=BaseResponse[StreetListResponse])
 async def get_streets(mo_id: int = Path(), district: str = Path()):
