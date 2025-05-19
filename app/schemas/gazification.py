@@ -55,6 +55,16 @@ class AddressCreateRequest(BaseModel):
     has_gas: bool
 
 
+class UpdateGasStatusRequest(BaseModel):
+    """Запрос на обновление статуса газификации для существующего адреса"""
+    mo_id: int
+    district: str
+    street: str
+    house: str
+    flat: str | None = None
+    has_gas: bool
+
+
 class AddressModel(BaseModel):
     """Модель адреса для запроса"""
     mo_id: int
