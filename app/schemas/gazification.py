@@ -37,6 +37,7 @@ class TypeValueModel(BaseModel):
     """Модель типа значения для API"""
     id: int
     type_value: str
+    description: str
 
 
 class TypeValuesResponse(BaseModel):

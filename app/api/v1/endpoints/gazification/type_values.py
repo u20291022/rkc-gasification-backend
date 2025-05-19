@@ -12,14 +12,15 @@ async def get_type_values():
     """Получение списка типов значений"""
     try:
         type_values = await TypeValue.filter(for_mobile=True).all()
-        print(type_values)
+
         log_db_operation("read", "TypeValue", {"count": len(type_values)})
         
         values_list = []
         for value in type_values:
             values_list.append(TypeValueModel(
                 id=value.id,
-                type_value=value.type_value or ""
+                type_value=value.type_value or "",
+                description=value.description
             ))
         
         return create_response(
