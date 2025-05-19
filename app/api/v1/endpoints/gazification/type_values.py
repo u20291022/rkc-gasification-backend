@@ -11,8 +11,8 @@ router = APIRouter()
 async def get_type_values():
     """Получение списка типов значений"""
     try:
-        type_values = await TypeValue.all()
-        
+        type_values = await TypeValue.filter(for_mobile=True).all()
+        print(type_values)
         log_db_operation("read", "TypeValue", {"count": len(type_values)})
         
         values_list = []

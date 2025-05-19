@@ -26,7 +26,8 @@ async def add_address(request: AddressCreateRequest):
                 city=request.district,
                 street=request.street,
                 house=request.house,
-                flat=request.flat
+                flat=request.flat,
+                is_mobile=True
             )
             
             # Создаем запись о газификации

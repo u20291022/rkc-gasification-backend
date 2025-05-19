@@ -40,7 +40,8 @@ class TypeValue(models.Model):
     """Модель для типов значений"""
     id = fields.IntField(primary_key=True)
     type_value = fields.CharField(max_length=128, null=True)
-    
+    for_mobile = fields.BooleanField()
+
     class Meta:
         schema = "s_gazifikacia"
         table = "t_type_value"
