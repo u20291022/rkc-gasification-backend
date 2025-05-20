@@ -44,7 +44,6 @@ class TypeValue(models.Model):
     for_mobile = fields.BooleanField()
     description = fields.CharField(max_length=256)
     field_type_id = fields.IntField(null=True)
-    field_reference_id = fields.IntField(null=True)
     
     class Meta:
         schema = "s_gazifikacia"
