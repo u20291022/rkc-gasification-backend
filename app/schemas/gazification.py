@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Dict, List
 
 # Схемы для работы с API газификации
 
@@ -33,11 +34,25 @@ class FlatListResponse(BaseModel):
     flats: list[str]
 
 
+class RelatedFieldModel(BaseModel):
+    """Модель связанного поля"""
+    field_id: int
+    field_name: str
+
+
+class ValueDependencyModel(BaseModel):
+    """Модель зависимости значения на другое поле"""
+    value: str
+    related_field: RelatedFieldModel
+
+
 class TypeValueModel(BaseModel):
     """Модель типа значения для API"""
     id: int
     type_value: str
     description: str
+    field_type: str | None = None  # Имя типа поля из таблицы FieldType
+    related_fields: List[ValueDependencyModel] = []
 
 
 class TypeValuesResponse(BaseModel):

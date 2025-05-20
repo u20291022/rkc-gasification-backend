@@ -42,7 +42,9 @@ class TypeValue(models.Model):
     type_value = fields.CharField(max_length=128, null=True)
     for_mobile = fields.BooleanField()
     description = fields.CharField(max_length=256)
-
+    field_type_id = fields.IntField(null=True)
+    field_reference_id = fields.IntField(null=True)
+    
     class Meta:
         schema = "s_gazifikacia"
         table = "t_type_value"
@@ -61,3 +63,25 @@ class GazificationData(models.Model):
     class Meta:
         schema = "s_gazifikacia"
         table = "t_gazifikacia_data"
+
+
+class FieldType(models.Model):
+    """Модель для типов полей"""
+    field_type_id = fields.IntField(primary_key=True)
+    field_type_name = fields.CharField(max_length=255, null=False)
+    
+    class Meta:
+        schema = "s_gazifikacia"
+        table = "field_type"
+
+
+class FieldReference(models.Model):
+    """Модель для связей между полями"""
+    field_reference_id = fields.IntField(primary_key=True)
+    field_origin_id = fields.IntField(null=False)
+    field_origin_value = fields.CharField(max_length=255, null=False)
+    field_ref_id = fields.IntField(null=False)
+    
+    class Meta:
+        schema = "s_gazifikacia"
+        table = "field_reference"
