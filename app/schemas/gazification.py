@@ -49,6 +49,7 @@ class ValueDependencyModel(BaseModel):
 class TypeValueModel(BaseModel):
     """Модель типа значения для API"""
     id: int
+    order: int
     type_value: str
     description: str
     field_type: str | None = None  # Имя типа поля из таблицы FieldType

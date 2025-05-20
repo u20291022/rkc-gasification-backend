@@ -39,6 +39,7 @@ class AddressV2(models.Model):
 class TypeValue(models.Model):
     """Модель для типов значений"""
     id = fields.IntField(primary_key=True)
+    order = fields.IntField()
     type_value = fields.CharField(max_length=128, null=True)
     for_mobile = fields.BooleanField()
     description = fields.CharField(max_length=256)
