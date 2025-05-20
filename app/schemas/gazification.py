@@ -43,7 +43,7 @@ class RelatedFieldModel(BaseModel):
 class ValueDependencyModel(BaseModel):
     """Модель зависимости значения на другое поле"""
     value: str
-    related_field: RelatedFieldModel
+    related_field_id: int
 
 
 class TypeValueModel(BaseModel):
