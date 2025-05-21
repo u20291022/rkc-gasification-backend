@@ -12,7 +12,7 @@ async def get_municipalities():
     """Получение списка муниципалитетов"""
     try:
         # Получаем только муниципалитеты с tip = 2
-        municipalities = await Municipality.filter(tip=2).all()
+        municipalities = await Municipality.filter(tip=1).all()
         address_municipalities = await AddressV2.filter()
         
         # Получаем список id муниципалитетов из AddressV2
@@ -23,8 +23,8 @@ async def get_municipalities():
         mo_list = []
         for mo in municipalities:
             # Проверяем, что муниципалитет присутствует и в AddressV2
-            if mo.id_parent in address_mo_ids:
-                mo_list.append(MunicipalityModel(id=mo.id_parent, name=mo.name))
+            if mo.id in address_mo_ids:
+                mo_list.append(MunicipalityModel(id=mo.id, name=mo.name))
         
         return create_response(
             data=MOListResponse(mos=mo_list)

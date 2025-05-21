@@ -129,5 +129,5 @@ def convert_type_value_to_model(
         type_value=type_value.type_value or "",
         description=type_value.description,
         field_type=field_type_name,
-        related_fields=related_fields or []  # Гарантируем, что related_fields всегда будет как минимум пустым списком
+        related_fields=related_fields or []  
     )
