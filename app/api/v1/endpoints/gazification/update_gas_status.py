@@ -6,6 +6,7 @@ from app.schemas.gazification import UpdateGasStatusRequest
 from app.models.models import AddressV2, GazificationData
 from app.core.exceptions import DatabaseError, NotFoundError
 from tortoise.transactions import in_transaction
+from tortoise.expressions import Q
 
 router = APIRouter()
 
@@ -21,47 +22,52 @@ async def update_gas_status(request: UpdateGasStatusRequest):
         )
         
         if request.district:
-            address_query = address_query.filter(district=request.district)
+            address_query = address_query.filter(
+                Q(district=request.district) | Q(city=request.district)
+            )
         else:
-            address_query = address_query.filter(district__isnull=True)
+            address_query = address_query.filter(
+                Q(district__isnull=True) & Q(city__isnull=True)
+            )
             
         if request.flat:
             address_query = address_query.filter(flat=request.flat)
         else:
             address_query = address_query.filter(flat__isnull=True)
             
-        address = await address_query.first()
+        addresses = await address_query.all()
         
-        if not address:
+        if not addresses:
             address_details = f"{request.mo_id}/{request.district or 'none'}/{request.street}/{request.house}/{request.flat or 'none'}"
             raise NotFoundError("Адрес не найден", address_details)
-            
-        async with in_transaction() as conn:
-            # id_type_address: 3 - подключены к газу, 4 - не подключены
-            id_type_address = 3 if request.has_gas else 4
-            
-            # Находим запись о газификации для данного адреса или создаем новую
-            gazification_data = await GazificationData.filter(id_address=address.id).all()
-            
-            if gazification_data:
-                # Обновляем существующую запись
-                for gaz_data_curr in gazification_data:
-                    gaz_data_curr.id_type_address = id_type_address
-                    await gaz_data_curr.save()
-            else:
-                # Создаем новую запись о газификации
-                await GazificationData.create(
-                    id_address=address.id,
-                    id_type_address=id_type_address,
-                )
-            
-            log_db_operation("update", "GazificationData", {
-                "mo_id": request.mo_id,
-                "district": request.district,
-                "street": request.street,
-                "house": request.house,
-                "has_gas": request.has_gas
-            })
+        
+        for address in addresses:
+            async with in_transaction() as conn:
+                # id_type_address: 3 - подключены к газу, 4 - не подключены
+                id_type_address = 3 if request.has_gas else 4
+                
+                # Находим запись о газификации для данного адреса или создаем новую
+                gazification_data = await GazificationData.filter(id_address=address.id).all()
+                
+                if gazification_data:
+                    # Обновляем существующую запись
+                    for gaz_data_curr in gazification_data:
+                        gaz_data_curr.id_type_address = id_type_address
+                        await gaz_data_curr.save()
+                else:
+                    # Создаем новую запись о газификации
+                    await GazificationData.create(
+                        id_address=address.id,
+                        id_type_address=id_type_address,
+                    )
+                
+                log_db_operation("update", "GazificationData", {
+                    "mo_id": request.mo_id,
+                    "district": request.district,
+                    "street": request.street,
+                    "house": request.house,
+                    "has_gas": request.has_gas
+                })
         
         return create_response(
             data=None,
