@@ -47,7 +47,7 @@ async def update_gas_status(request: UpdateGasStatusRequest):
                 # Обновляем существующую запись
                 for gaz_data_curr in gazification_data:
                     gaz_data_curr.id_type_address = id_type_address
-                    await gazification_data.save()
+                    await gaz_data_curr.save()
             else:
                 # Создаем новую запись о газификации
                 await GazificationData.create(
