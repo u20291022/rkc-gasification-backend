@@ -41,11 +41,12 @@ async def update_gas_status(request: UpdateGasStatusRequest):
             id_type_address = 3 if request.has_gas else 4
             
             # Находим запись о газификации для данного адреса или создаем новую
-            gazification_data = await GazificationData.filter(id_address=address.id).first()
+            gazification_data = await GazificationData.filter(id_address=address.id).all()
             
             if gazification_data:
                 # Обновляем существующую запись
-                gazification_data.id_type_address = id_type_address
+                for gaz_data_curr in gazification_data:
+                    gaz_data_curr.id_type_address = id_type_address
                 await gazification_data.save()
             else:
                 # Создаем новую запись о газификации
