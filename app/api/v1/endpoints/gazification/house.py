@@ -16,46 +16,39 @@ async def get_houses(mo_id: int = Path(), district: str = Path(), street: str = 
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
         ).values_list('id_address', flat=True)
-        
-        # Получаем адреса, соответствующие району (district или city) и улице
-        # исключая газифицированные адреса
-        addresses = await AddressV2.filter(
+          # Оптимизированный запрос: получаем уникальные дома напрямую из БД
+        # для записей с district, соответствующим переданному значению
+        district_houses = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(street=street) &
             Q(house__isnull=False) &
+            Q(district=district) &
             ~Q(id__in=gazified_addresses)
-        ).filter(
-            district=district
-        ).all()
-        
-        # Также проверяем записи, где district пустой, но city соответствует district
-        # исключая газифицированные адреса
-        additional_addresses = await AddressV2.filter(
+        ).distinct().values_list(
+            'house', flat=True)
+          # Также получаем дома для записей, где district пустой, но city соответствует district
+        city_houses = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &
             Q(city=district) &
             Q(street=street) &
             Q(house__isnull=False) &
             ~Q(id__in=gazified_addresses)
-        ).all()
+        ).distinct().values_list(
+            'house', flat=True)
         
-        all_addresses = addresses + additional_addresses
+        # Объединяем результаты
+        all_houses = list(set(list(district_houses) + list(city_houses)))
         
         log_db_operation("read", "AddressV2", {
             "mo_id": mo_id, 
             "district": district,
             "street": street,
-            "count": len(all_addresses)
+            "count": len(all_houses)
         })
         
-        # Собираем все уникальные дома
-        houses = set()
-        for address in all_addresses:
-            if address.house:
-                houses.add(address.house)
-        
         return create_response(
-            data=HouseListResponse(houses=sorted(list(houses)))
+            data=HouseListResponse(houses=sorted(all_houses))
         )
     except Exception as e:
         raise DatabaseError(f"Ошибка при получении списка домов: {str(e)}")

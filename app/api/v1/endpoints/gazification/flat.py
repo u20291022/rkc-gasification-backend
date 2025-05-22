@@ -16,21 +16,19 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
         ).values_list('id_address', flat=True)
-        
-        # Получаем адреса по всем параметрам, исключая газифицированные
-        addresses = await AddressV2.filter(
+          # Оптимизированный запрос: получаем уникальные квартиры напрямую из БД
+        # для записей с district, соответствующим переданному значению
+        district_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(street=street) &
             Q(house=house) &
+            Q(district=district) &
             Q(flat__isnull=False) &
             ~Q(id__in=gazified_addresses)
-        ).filter(
-            district=district
-        ).all()
-        
-        # Также проверяем записи, где district пустой, но city соответствует district
-        # исключая газифицированные
-        additional_addresses = await AddressV2.filter(
+        ).distinct().values_list(
+            'flat', flat=True)
+          # Также получаем квартиры для записей, где district пустой, но city соответствует district
+        city_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &
             Q(city=district) &
@@ -38,26 +36,22 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
             Q(house=house) &
             Q(flat__isnull=False) &
             ~Q(id__in=gazified_addresses)
-        ).all()
+        ).distinct().values_list(
+            'flat', flat=True)
         
-        all_addresses = addresses + additional_addresses
+        # Объединяем результаты
+        all_flats = list(set(list(district_flats) + list(city_flats)))
         
         log_db_operation("read", "AddressV2", {
             "mo_id": mo_id, 
             "district": district,
             "street": street,
             "house": house,
-            "count": len(all_addresses)
+            "count": len(all_flats)
         })
         
-        # Собираем все уникальные квартиры
-        flats = set()
-        for address in all_addresses:
-            if address.flat:
-                flats.add(address.flat)
-        
         return create_response(
-            data=FlatListResponse(flats=sorted(list(flats)))
+            data=FlatListResponse(flats=sorted(all_flats))
         )
     except Exception as e:
         raise DatabaseError(f"Ошибка при получении списка квартир: {str(e)}")

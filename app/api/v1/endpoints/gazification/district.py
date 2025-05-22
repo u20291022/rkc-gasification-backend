@@ -5,6 +5,7 @@ from app.schemas.gazification import DistrictListResponse
 from app.models.models import AddressV2, GazificationData
 from app.core.exceptions import DatabaseError
 from tortoise.expressions import Q
+from tortoise.functions import Coalesce
 
 router = APIRouter()
 
@@ -16,24 +17,20 @@ async def get_districts(mo_id: int = Path()):
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
         ).values_list('id_address', flat=True)
-        
-        # Получаем уникальные районы для данного муниципалитета
-        # исключая газифицированные адреса и убеждаясь, что есть дома
-        addresses = await AddressV2.filter(
+          # Оптимизированный запрос: получаем уникальные районы напрямую из БД
+        # используя Coalesce для выбора district или city, если district отсутствует
+        districts = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(house__isnull=False) &
             ~Q(id__in=gazified_addresses)
-        ).all()
+        ).annotate(
+            district_name=Coalesce('district', 'city')
+        ).filter(
+            district_name__isnull=False
+        ).distinct().values_list(
+            'district_name', flat=True)
         
-        log_db_operation("read", "AddressV2", {"mo_id": mo_id, "count": len(addresses)})
-        
-        # Собираем все уникальные районы
-        districts = set()
-        for address in addresses:
-            # Используем district или city, если district отсутствует
-            district_name = address.district or address.city
-            if district_name:
-                districts.add(district_name)
+        log_db_operation("read", "AddressV2", {"mo_id": mo_id, "count": len(districts)})
         
         return create_response(
             data=DistrictListResponse(districts=sorted(list(districts)))
