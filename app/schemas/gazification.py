@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from typing import Dict, List
 
 # Схемы для работы с API газификации
 
@@ -53,7 +52,8 @@ class TypeValueModel(BaseModel):
     type_value: str
     description: str
     field_type: str | None = None  # Имя типа поля из таблицы FieldType
-    related_fields: List[ValueDependencyModel] = []
+    related_fields: list[ValueDependencyModel] = []
+    answers: list[str] = []
 
 
 class TypeValuesResponse(BaseModel):

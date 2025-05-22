@@ -2,9 +2,8 @@ from fastapi import APIRouter
 from app.core.utils import create_response, log_db_operation
 from app.schemas.base import BaseResponse
 from app.schemas.gazification import TypeValueModel, TypeValuesResponse, RelatedFieldModel, ValueDependencyModel
-from app.models.models import TypeValue, FieldType, FieldReference
+from app.models.models import FieldAnswer, TypeValue, FieldType, FieldReference
 from app.core.exceptions import DatabaseError
-from typing import Dict, List, Optional
 import logging
 
 router = APIRouter()
@@ -15,20 +14,16 @@ logger = logging.getLogger(__name__)
 async def get_type_values():
     """Получение списка типов значений"""
     try:
-        # 1. Оптимизированный подход: получаем все типы значений для мобильного приложения
         type_values = await TypeValue.filter(for_mobile=True).order_by("order").prefetch_related()
         log_db_operation("read", "TypeValue", {"count": len(type_values)})
         
-        # 2. Получаем отображение ID типов полей на их имена - оптимизировано
         field_types = await FieldType.all()
         field_type_mapping = {ft.field_type_id: ft.field_type_name for ft in field_types}
         log_db_operation("read", "FieldType", {"count": len(field_types)})
         
-        # 3. Получаем зависимости между полями - оптимизировано с предзагрузкой
         references = await FieldReference.all()
         log_db_operation("read", "FieldReference", {"count": len(references)})
         
-        # Построение оптимизированной структуры зависимостей для более быстрого поиска
         field_references = {}
         for ref in references:
             normalized_value = str(ref.field_origin_value).lower().strip('"\'')
@@ -46,12 +41,10 @@ async def get_type_values():
                 )
             )
 
-        # 4. Преобразуем модели БД в модели API с оптимизированной логикой
         values_list = []
         for type_value in type_values:
             related_fields = []
             
-            # Обработка связанных полей
             if type_value.id and type_value.id in field_references:
                 for field_value, related_field_models in field_references[type_value.id].items():
                     original_value = field_value
@@ -66,7 +59,12 @@ async def get_type_values():
                             )
                         )
             
-            # Создаем модель для API
+            answers = await FieldAnswer.filter(type_value_id=type_value.id).all()
+            if not answers:
+                answers = [answer.field_answer_value for answer in answers]
+            else:
+                answers = []
+
             values_list.append(
                 TypeValueModel(
                     id=type_value.id,
@@ -74,11 +72,11 @@ async def get_type_values():
                     type_value=type_value.type_value or "",
                     description=type_value.description,
                     field_type=field_type_mapping.get(type_value.field_type_id) if type_value.field_type_id else None,
-                    related_fields=related_fields
+                    related_fields=related_fields,
+                    answers=answers
                 )
             )
         
-        # 5. Формируем и возвращаем ответ
         return create_response(
             data=TypeValuesResponse(type_values=values_list)
         )

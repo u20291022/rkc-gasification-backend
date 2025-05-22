@@ -86,3 +86,14 @@ class FieldReference(models.Model):
     class Meta:
         schema = "s_gazifikacia"
         table = "field_reference"
+
+
+class FieldAnswer(models.Model):
+    """Модель для ответов на поля"""
+    field_answer_id = fields.IntField(primary_key=True)
+    field_answer_value = fields.TextField(null=False)
+    type_value_id = fields.IntField(null=False)
+    
+    class Meta:
+        schema = "s_gazifikacia"
+        table = "field_answers"
