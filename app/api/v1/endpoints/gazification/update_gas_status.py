@@ -1,5 +1,4 @@
 from fastapi import APIRouter
-from pydantic import ValidationError
 from app.core.utils import create_response, log_db_operation
 from app.schemas.base import BaseResponse
 from app.schemas.gazification import UpdateGasStatusRequest
@@ -59,6 +58,7 @@ async def update_gas_status(request: UpdateGasStatusRequest):
                     await GazificationData.create(
                         id_address=address.id,
                         id_type_address=id_type_address,
+                        is_mobile=True
                     )
                 
                 log_db_operation("update", "GazificationData", {

@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from fastapi import APIRouter
 from app.core.utils import create_response, log_db_operation
 from app.schemas.base import BaseResponse
@@ -37,6 +36,7 @@ async def add_address(request: AddressCreateRequest):
             await GazificationData.create(
                 id_address=address.id,
                 id_type_address=id_type_address,
+                is_mobile=True
             )
             
             log_db_operation("create", "AddressV2 and GazificationData", {

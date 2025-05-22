@@ -59,7 +59,8 @@ class GazificationData(models.Model):
     value = fields.CharField(max_length=256, null=True)  # true/false или текст
     date_doc = fields.DateField(null=True)
     date = fields.DateField(null=True)
-    
+    is_mobile = fields.BooleanField(default=False)
+
     class Meta:
         schema = "s_gazifikacia"
         table = "t_gazifikacia_data"
