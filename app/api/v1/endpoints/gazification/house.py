@@ -16,22 +16,30 @@ async def get_houses(mo_id: int = Path(), district: str = Path(), street: str = 
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
         ).values_list('id_address', flat=True)
-          # Оптимизированный запрос: получаем уникальные дома напрямую из БД
+          
+        # Создаем условие для проверки улицы
+        street_condition = Q(street=street)
+        if street == '':
+            # Если улица пустая строка, добавляем проверку на NULL
+            street_condition = Q(street='') | Q(street__isnull=True)
+          
+        # Оптимизированный запрос: получаем уникальные дома напрямую из БД
         # для записей с district, соответствующим переданному значению
         district_houses = await AddressV2.filter(
             Q(id_mo=mo_id) &
-            Q(street=street) &
+            street_condition &
             Q(house__isnull=False) &
             Q(district=district) &
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list(
             'house', flat=True)
-          # Также получаем дома для записей, где district пустой, но city соответствует district
+          
+        # Также получаем дома для записей, где district пустой, но city соответствует district
         city_houses = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &
             Q(city=district) &
-            Q(street=street) &
+            street_condition &
             Q(house__isnull=False) &
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list(
