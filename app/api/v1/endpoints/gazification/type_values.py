@@ -60,7 +60,7 @@ async def get_type_values():
                         )
             
             answers = await FieldAnswer.filter(type_value_id=type_value.id).all()
-            if not answers:
+            if answers:
                 answers = [answer.field_answer_value for answer in answers]
             else:
                 answers = []
