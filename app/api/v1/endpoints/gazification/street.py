@@ -50,6 +50,9 @@ async def get_streets(mo_id: int = Path(), district: str = Path()):
         # Объединяем результаты
         all_streets = list(set(list(district_streets) + list(city_streets)))
         
+        if not all_streets:
+            all_streets.append('Нет улиц')
+
         log_db_operation("read", "AddressV2", {
             "mo_id": mo_id, 
             "district": district, 

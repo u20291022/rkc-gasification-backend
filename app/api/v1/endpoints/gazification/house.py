@@ -19,7 +19,7 @@ async def get_houses(mo_id: int = Path(), district: str = Path(), street: str = 
           
         # Создаем условие для проверки улицы
         street_condition = Q(street=street)
-        if street == '':
+        if street == '' or street == 'Нет улиц':
             # Если улица пустая строка, добавляем проверку на NULL
             street_condition = Q(street='') | Q(street__isnull=True)
           
