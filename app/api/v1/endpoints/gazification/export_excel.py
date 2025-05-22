@@ -30,8 +30,7 @@ async def export_to_excel(
             status_code=400, 
             detail="Необходимо указать хотя бы один параметр: mo_id, district или street"
         )
-    try:
-        # Получаем данные для экспорта
+    try:        # Получаем данные для экспорта
         addresses, questions, answers = await get_gazification_data(mo_id, district, street)
         
         if not addresses:
@@ -43,12 +42,16 @@ async def export_to_excel(
         # Создаем DataFrame для экспорта
         data = []
         for address in addresses:
+            # Определяем статус газификации
+            gas_status = "Да" if address.get('gas_type') == 3 else "Нет"
+            
             row = {
                 'Муниципалитет': address.get('mo_name', 'Не указан'),
                 'Район': address.get('district') or address.get('city') or 'Не указан',
                 'Улица': address.get('street', 'Не указана'),
                 'Дом': address.get('house', 'Не указан'),
-                'Квартира': address.get('flat', '') 
+                'Квартира': address.get('flat', ''),
+                'Газифицирован?': gas_status
             }
             
             # Добавляем столбцы для всех вопросов и их ответы

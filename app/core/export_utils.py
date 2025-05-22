@@ -23,14 +23,25 @@ async def get_gazification_data(
             - questions: список вопросов (TypeValue) для отображения в отчете
             - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса, 
               ключ внутренний - id вопроса, значение - ответ
-    """
-    # Находим адреса, которые уже газифицированы (id_type_address = 3)
-    gazified_addresses = await GazificationData.filter(
-        id_type_address=3
-    ).values_list('id_address', flat=True)
+    """    # Находим адреса, которые имеют статус газификации (id_type_address = 3 или 4)
+    gazification_status = {}
+    
+    # Получаем данные о статусе газификации для адресов
+    gas_status_data = await GazificationData.filter(
+        id_type_address__in=[3, 4]
+    ).values('id_address', 'id_type_address')
+    
+    # Создаем словарь {id_address: id_type_address}
+    for item in gas_status_data:
+        address_id = item['id_address']
+        type_address = item['id_type_address']
+        gazification_status[address_id] = type_address
+    
+    # Получаем список адресов с информацией о газификации
+    addresses_with_gas_info = list(gazification_status.keys())
     
     # Базовый фильтр для адресов
-    base_filter = Q(house__isnull=False) & ~Q(id__in=gazified_addresses)
+    base_filter = Q(house__isnull=False) & Q(id__in=addresses_with_gas_info)
     
     # Добавляем фильтры на основе переданных параметров
     if mo_id is not None:
@@ -56,8 +67,7 @@ async def get_gazification_data(
         query = query.annotate(
             street_lower=Lower(Trim("street"))
         ).filter(street_lower=normalized_street)
-    
-    # Получаем все подходящие адреса
+      # Получаем все подходящие адреса
     addresses = await query.values(
         'id', 'id_mo', 'district', 'city', 'street', 'house', 'flat'
     )
@@ -68,6 +78,12 @@ async def get_gazification_data(
         "street": street,
         "count": len(addresses)
     })
+    
+    # Добавляем информацию о статусе газификации к адресам
+    for address in addresses:
+        address_id = address['id']
+        if address_id in gazification_status:
+            address['gas_type'] = gazification_status[address_id]
     
     # Получаем названия муниципалитетов для всех адресов
     mo_ids = {address['id_mo'] for address in addresses if address['id_mo'] is not None}
