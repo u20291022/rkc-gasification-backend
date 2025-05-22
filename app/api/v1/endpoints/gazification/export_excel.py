@@ -30,10 +30,9 @@ async def export_to_excel(
             status_code=400, 
             detail="Необходимо указать хотя бы один параметр: mo_id, district или street"
         )
-    
     try:
         # Получаем данные для экспорта
-        addresses, questions = await get_gazification_data(mo_id, district, street)
+        addresses, questions, answers = await get_gazification_data(mo_id, district, street)
         
         if not addresses:
             raise HTTPException(
@@ -52,10 +51,19 @@ async def export_to_excel(
                 'Квартира': address.get('flat', '') 
             }
             
-            # Добавляем столбцы для всех вопросов
+            # Добавляем столбцы для всех вопросов и их ответы
             for question in questions:
-                column_name = question.get('type_value', f"Вопрос {question.get('id')}")
-                row[column_name] = '' # Пустые значения, так как данные не заполнены
+                question_id = question.get('id')
+                column_name = question.get('type_value', f"Вопрос {question_id}")
+                
+                # Ищем ответ на вопрос для текущего адреса
+                address_id = address.get('id')
+                answer_value = ''
+                
+                if address_id in answers and question_id in answers[address_id]:
+                    answer_value = answers[address_id][question_id]
+                
+                row[column_name] = answer_value
                 
             data.append(row)
         

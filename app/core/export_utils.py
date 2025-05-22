@@ -8,7 +8,7 @@ async def get_gazification_data(
     mo_id: Optional[int] = None, 
     district: Optional[str] = None, 
     street: Optional[str] = None
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
     """
     Получает данные о газификации на основе фильтров
     
@@ -18,9 +18,11 @@ async def get_gazification_data(
         street: Название улицы (опционально)
         
     Returns:
-        Tuple[List[Dict], List[Dict]]: (addresses, questions)
+        Tuple[List[Dict], List[Dict], Dict[int, Dict[int, str]]]: (addresses, questions, answers)
             - addresses: список адресов, соответствующих фильтрам
             - questions: список вопросов (TypeValue) для отображения в отчете
+            - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса, 
+              ключ внутренний - id вопроса, значение - ответ
     """
     # Находим адреса, которые уже газифицированы (id_type_address = 3)
     gazified_addresses = await GazificationData.filter(
@@ -93,8 +95,7 @@ async def get_gazification_data(
             question['field_type'] = field_type_mapping.get(field_type_id)
     
     log_db_operation("read", "TypeValue", {"count": len(questions)})
-    
-    # Обогащаем адреса названиями муниципалитетов
+      # Обогащаем адреса названиями муниципалитетов
     for address in addresses:
         mo_id = address.get('id_mo')
         if mo_id and mo_id in mo_names:
@@ -102,4 +103,31 @@ async def get_gazification_data(
         else:
             address['mo_name'] = "Неизвестный муниципалитет"
     
-    return addresses, questions
+    # Получаем ответы на вопросы для найденных адресов
+    address_ids = [address['id'] for address in addresses]
+    answers_data = await GazificationData.filter(
+        id_address__in=address_ids,
+        id_type_value__isnull=False
+    ).values('id_address', 'id_type_value', 'value')
+    
+    # Форматируем ответы в виде словаря {id_address: {id_type_value: value}}
+    answers = {}
+    for answer in answers_data:
+        address_id = answer['id_address']
+        type_value_id = answer['id_type_value']
+        value = answer['value']
+        
+        # Преобразуем true/false в Да/Нет
+        if value and value.lower() == 'true':
+            value = 'Да'
+        elif value and value.lower() == 'false':
+            value = 'Нет'
+        
+        if address_id not in answers:
+            answers[address_id] = {}
+            
+        answers[address_id][type_value_id] = value
+    
+    log_db_operation("read", "GazificationData", {"count": len(answers_data)})
+    
+    return addresses, questions, answers
