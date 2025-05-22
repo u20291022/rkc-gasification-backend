@@ -81,6 +81,9 @@ async def get_gazification_data(
     
     # Добавляем информацию о статусе газификации к адресам
     for address in addresses:
+        if address['street'] == 'Нет улиц':
+            address['street'] = ''
+
         address_id = address['id']
         if address_id in gazification_status:
             address['gas_type'] = gazification_status[address_id]
