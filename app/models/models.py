@@ -97,3 +97,13 @@ class FieldAnswer(models.Model):
     class Meta:
         schema = "s_gazifikacia"
         table = "field_answers"
+
+class User(models.Model):
+    """Модель для пользователей системы"""
+    user_id = fields.IntField(pk=True)
+    email = fields.CharField(max_length=255, null=False)
+    password_hash = fields.CharField(max_length=255, null=False)
+    
+    class Meta:
+        table = "users"
+        schema = "public"

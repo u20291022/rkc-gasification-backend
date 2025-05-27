@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints.gazification import municipality, district, street, house, flat, add_address, upload, type_values, update_gas_status, export_excel
+from app.api.v1.endpoints.gazification import municipality, district, street, house, flat, add_address, upload, type_values, update_gas_status, export_excel, auth
 
 router = APIRouter()
 
@@ -14,3 +14,4 @@ router.include_router(update_gas_status.router)
 router.include_router(upload.router)
 router.include_router(type_values.router)
 router.include_router(export_excel.router)
+router.include_router(auth.router, prefix="/auth", tags=["authentication"])
