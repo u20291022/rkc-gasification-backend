@@ -105,5 +105,5 @@ class User(models.Model):
     password_hash = fields.CharField(max_length=255, null=False)
     
     class Meta:
+        schema = "s_gazifikacia"
         table = "users"
-        schema = "public"
