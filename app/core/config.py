@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     DATABASE_URL: str
+    # Настройки для базы данных addresses (ГАР)
+    ADDRESSES_DATABASE_URL: str = "postgresql://postgres:password@localhost:5432/addresses"
     LOG_LEVEL: str = "INFO"
     ENABLE_REQUEST_LOGGING: bool = True
     LOG_SQL_QUERIES: bool = False
@@ -16,6 +18,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# Конфигурация для Tortoise ORM (основная база данных)
 TORTOISE_ORM = {
     "connections": {"default": settings.DATABASE_URL},
     "apps": {
@@ -27,3 +30,6 @@ TORTOISE_ORM = {
     "use_tz": True,
     "timezone": "UTC"
 }
+
+# Глобальная переменная для пула соединений addresses
+addresses_connection_pool = None
