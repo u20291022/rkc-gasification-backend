@@ -26,7 +26,7 @@ async def get_municipalities():
         
         # Получаем только муниципалитеты с tip = 1, которые есть в списке valid_mo_ids
         municipalities = await Municipality.filter(
-            Q(tip=1) &
+            Q(tip=2) &
             Q(id__in=valid_mo_ids)
         ).all()
         

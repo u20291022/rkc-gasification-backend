@@ -1,0 +1,886 @@
+{
+  "info": {
+    "name": "RKC Gazification API - Address Hints",
+    "description": "API для работы с адресными подсказками (ГАР)",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "apiVersion",
+      "value": "v1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Address Hints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "health"]
+            },
+            "description": "Проверка состояния сервиса адресных подсказок и базы данных addresses"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Municipalities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/municipalities?search=&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "municipalities"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Поиск по названию"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Лимит результатов (1-1000)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Получить список муниципальных образований с возможностью поиска по названию. Группирует схожие административные единицы (г + г.о., р-н + м.о.)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Municipality by Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/municipalities?search=Москва&limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "municipalities"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "Москва",
+                  "description": "Поиск по названию"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Пример поиска муниципального образования по названию"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Address Structure",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/address-structure/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "address-structure", "1"]
+            },
+            "description": "Определить структуру адресных данных для муниципального образования (есть ли улицы или только населенные пункты)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Streets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/streets?municipality_id=1&search=&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "streets"],
+              "query": [
+                {
+                  "key": "municipality_id",
+                  "value": "1",
+                  "description": "ID муниципального образования (обязательно)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Поиск по названию улицы"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Получить список улиц для заданного муниципального образования"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Streets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/streets?municipality_id=1&search=Ленина&limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "streets"],
+              "query": [
+                {
+                  "key": "municipality_id",
+                  "value": "1",
+                  "description": "ID муниципального образования"
+                },
+                {
+                  "key": "search",
+                  "value": "Ленина",
+                  "description": "Поиск улиц по названию"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Пример поиска улиц по названию"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Houses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/houses?street_id=1&search=&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "houses"],
+              "query": [
+                {
+                  "key": "street_id",
+                  "value": "1",
+                  "description": "ID улицы (обязательно)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Поиск по номеру дома"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Получить список домов для заданной улицы"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Houses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/houses?street_id=1&search=10&limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "houses"],
+              "query": [
+                {
+                  "key": "street_id",
+                  "value": "1",
+                  "description": "ID улицы"
+                },
+                {
+                  "key": "search",
+                  "value": "10",
+                  "description": "Поиск домов по номеру"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Пример поиска домов по номеру"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Apartments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/apartments?house_id=1&search=&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "apartments"],
+              "query": [
+                {
+                  "key": "house_id",
+                  "value": "1",
+                  "description": "ID дома (обязательно)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Поиск по номеру квартиры"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Получить список квартир/помещений для заданного дома"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Apartments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/apartments?house_id=1&search=15&limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "apartments"],
+              "query": [
+                {
+                  "key": "house_id",
+                  "value": "1",
+                  "description": "ID дома"
+                },
+                {
+                  "key": "search",
+                  "value": "15",
+                  "description": "Поиск квартир по номеру"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Пример поиска квартир по номеру"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Rooms",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/rooms?apartment_id=1&search=&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "rooms"],
+              "query": [
+                {
+                  "key": "apartment_id",
+                  "value": "1",
+                  "description": "ID квартиры (обязательно)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Поиск по номеру комнаты"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Получить список комнат для заданной квартиры"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Settlements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/settlements?municipality_id=1&search=&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "settlements"],
+              "query": [
+                {
+                  "key": "municipality_id",
+                  "value": "1",
+                  "description": "ID административной единицы (обязательно)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Поиск по названию населенного пункта"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Получить список населенных пунктов (деревни, села, СНТ) для административной единицы"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Settlements",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/settlements?municipality_id=1&search=село&limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "settlements"],
+              "query": [
+                {
+                  "key": "municipality_id",
+                  "value": "1",
+                  "description": "ID административной единицы"
+                },
+                {
+                  "key": "search",
+                  "value": "село",
+                  "description": "Поиск населенных пунктов по названию"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Пример поиска населенных пунктов по названию"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Rural Houses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/rural-houses?settlement_id=1&search=&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "rural-houses"],
+              "query": [
+                {
+                  "key": "settlement_id",
+                  "value": "1",
+                  "description": "Object ID населенного пункта (обязательно)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Поиск по номеру дома"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Получить список домов в населенном пункте (сельская местность, без привязки к улице)"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Rural Houses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{apiVersion}}/addresses/rural-houses?settlement_id=1&search=5&limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{apiVersion}}", "addresses", "rural-houses"],
+              "query": [
+                {
+                  "key": "settlement_id",
+                  "value": "1",
+                  "description": "Object ID населенного пункта"
+                },
+                {
+                  "key": "search",
+                  "value": "5",
+                  "description": "Поиск сельских домов по номеру"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Лимит результатов"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Смещение"
+                }
+              ]
+            },
+            "description": "Пример поиска сельских домов по номеру"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Typical Use Cases",
+      "item": [
+        {
+          "name": "City Address Flow",
+          "item": [
+            {
+              "name": "1. Get Cities/Districts",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/municipalities?search=&limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "municipalities"],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "Поиск по названию"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Шаг 1: Получить список городов/районов для выбора"
+              }
+            },
+            {
+              "name": "2. Get Streets in City",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/streets?municipality_id={{selectedMunicipalityId}}&search=&limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "streets"],
+                  "query": [
+                    {
+                      "key": "municipality_id",
+                      "value": "{{selectedMunicipalityId}}",
+                      "description": "ID выбранного города из шага 1"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Шаг 2: Получить улицы в выбранном городе"
+              }
+            },
+            {
+              "name": "3. Get Houses on Street",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/houses?street_id={{selectedStreetId}}&search=&limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "houses"],
+                  "query": [
+                    {
+                      "key": "street_id",
+                      "value": "{{selectedStreetId}}",
+                      "description": "ID выбранной улицы из шага 2"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Шаг 3: Получить дома на выбранной улице"
+              }
+            },
+            {
+              "name": "4. Get Apartments in House",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/apartments?house_id={{selectedHouseId}}&search=&limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "apartments"],
+                  "query": [
+                    {
+                      "key": "house_id",
+                      "value": "{{selectedHouseId}}",
+                      "description": "ID выбранного дома из шага 3"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Шаг 4: Получить квартиры в выбранном доме"
+              }
+            },
+            {
+              "name": "5. Get Rooms in Apartment",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/rooms?apartment_id={{selectedApartmentId}}&search=&limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "rooms"],
+                  "query": [
+                    {
+                      "key": "apartment_id",
+                      "value": "{{selectedApartmentId}}",
+                      "description": "ID выбранной квартиры из шага 4"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Шаг 5: Получить комнаты в выбранной квартире"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rural Address Flow",
+          "item": [
+            {
+              "name": "1. Get Districts",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/municipalities?search=&limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "municipalities"],
+                  "query": [
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Шаг 1: Получить список районов"
+              }
+            },
+            {
+              "name": "2. Check Address Structure",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/address-structure/{{selectedMunicipalityId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "address-structure", "{{selectedMunicipalityId}}"]
+                },
+                "description": "Шаг 2: Проверить структуру адресных данных (есть ли улицы или только населенные пункты)"
+              }
+            },
+            {
+              "name": "3. Get Settlements",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/settlements?municipality_id={{selectedMunicipalityId}}&search=&limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "settlements"],
+                  "query": [
+                    {
+                      "key": "municipality_id",
+                      "value": "{{selectedMunicipalityId}}",
+                      "description": "ID выбранного района из шага 1"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Шаг 3: Получить населенные пункты в выбранном районе"
+              }
+            },
+            {
+              "name": "4. Get Rural Houses",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/{{apiVersion}}/addresses/rural-houses?settlement_id={{selectedSettlementObjectId}}&search=&limit=50&offset=0",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["{{apiVersion}}", "addresses", "rural-houses"],
+                  "query": [
+                    {
+                      "key": "settlement_id",
+                      "value": "{{selectedSettlementObjectId}}",
+                      "description": "Object ID выбранного населенного пункта из шага 3"
+                    },
+                    {
+                      "key": "search",
+                      "value": ""
+                    },
+                    {
+                      "key": "limit",
+                      "value": "50"
+                    },
+                    {
+                      "key": "offset",
+                      "value": "0"
+                    }
+                  ]
+                },
+                "description": "Шаг 4: Получить дома в выбранном населенном пункте"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Логирование начала запроса",
+          "console.log(`🚀 Выполняется запрос: ${pm.request.method} ${pm.request.url}`);",
+          "",
+          "// Установка timestamp для измерения времени ответа",
+          "pm.environment.set('requestStartTime', new Date().getTime());"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Измерение времени ответа",
+          "const startTime = pm.environment.get('requestStartTime');",
+          "const responseTime = new Date().getTime() - startTime;",
+          "pm.environment.set('lastResponseTime', responseTime);",
+          "",
+          "// Базовые тесты статус кода",
+          "pm.test('✅ Status code is 200', function () {",
+          "    pm.response.to.have.status(200);",
+          "});",
+          "",
+          "pm.test('✅ Response time is acceptable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000); // менее 5 секунд",
+          "});",
+          "",
+          "// Тесты структуры ответа",
+          "pm.test('✅ Response has correct structure', function () {",
+          "    const jsonData = pm.response.json();",
+          "    pm.expect(jsonData).to.have.property('ok');",
+          "    pm.expect(jsonData.ok).to.be.true;",
+          "    pm.expect(jsonData).to.have.property('message');",
+          "});",
+          "",
+          "// Проверка данных (кроме health check)",
+          "if (!pm.request.url.path.includes('health') && !pm.request.url.path.includes('address-structure')) {",
+          "    pm.test('✅ Response has data field', function () {",
+          "        const jsonData = pm.response.json();",
+          "        pm.expect(jsonData).to.have.property('data');",
+          "        pm.expect(jsonData.data).to.have.property('items');",
+          "        pm.expect(jsonData.data).to.have.property('total');",
+          "        pm.expect(jsonData.data.items).to.be.an('array');",
+          "    });",
+          "",
+          "    // Проверка структуры элементов",
+          "    pm.test('✅ Items have correct structure', function () {",
+          "        const jsonData = pm.response.json();",
+          "        if (jsonData.data.items.length > 0) {",
+          "            const firstItem = jsonData.data.items[0];",
+          "            pm.expect(firstItem).to.have.property('id');",
+          "            pm.expect(firstItem).to.have.property('name');",
+          "        }",
+          "    });",
+          "}",
+          "",
+          "// Сохранение метрик",
+          "const jsonData = pm.response.json();",
+          "if (jsonData.data && jsonData.data.total !== undefined) {",
+          "    pm.environment.set('totalItemsFound', jsonData.data.total);",
+          "    console.log(`📊 Найдено элементов: ${jsonData.data.total}`);",
+          "}",
+          "",
+          "// Автоматическое сохранение ID для цепочки запросов",
+          "if (jsonData.data && jsonData.data.items && jsonData.data.items.length > 0) {",
+          "    const firstItem = jsonData.data.items[0];",
+          "    ",
+          "    if (pm.request.url.path.includes('municipalities')) {",
+          "        pm.environment.set('selectedMunicipalityId', firstItem.id);",
+          "        console.log(`🏙️ Выбран муниципалитет ID: ${firstItem.id} (${firstItem.name})`);",
+          "    } else if (pm.request.url.path.includes('streets')) {",
+          "        pm.environment.set('selectedStreetId', firstItem.id);",
+          "        console.log(`🛣️ Выбрана улица ID: ${firstItem.id} (${firstItem.name})`);",
+          "    } else if (pm.request.url.path.includes('houses') && !pm.request.url.path.includes('rural')) {",
+          "        pm.environment.set('selectedHouseId', firstItem.id);",
+          "        console.log(`🏠 Выбран дом ID: ${firstItem.id} (${firstItem.name})`);",
+          "    } else if (pm.request.url.path.includes('apartments')) {",
+          "        pm.environment.set('selectedApartmentId', firstItem.id);",
+          "        console.log(`🚪 Выбрана квартира ID: ${firstItem.id} (${firstItem.name})`);",
+          "    } else if (pm.request.url.path.includes('settlements')) {",
+          "        pm.environment.set('selectedSettlementObjectId', firstItem.object_id);",
+          "        console.log(`🏘️ Выбран населённый пункт ObjectID: ${firstItem.object_id} (${firstItem.name})`);",
+          "    } else if (pm.request.url.path.includes('rural-houses')) {",
+          "        pm.environment.set('selectedRuralHouseId', firstItem.id);",
+          "        console.log(`🏚️ Выбран сельский дом ID: ${firstItem.id} (${firstItem.name})`);",
+          "    }",
+          "}",
+          "",
+          "console.log(`⏱️ Время ответа: ${responseTime}ms`);"
+        ]
+      }
+    }
+  ]
+}
