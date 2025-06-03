@@ -6,7 +6,6 @@ from app.api.v1 import api_v1_router
 from app.core.utils import general_exception_handler, http_exception_handler, validation_exception_handler
 from app.core.logging import setup_logging, get_logger, categorize_log, LogCategory
 from app.core.middleware import setup_middlewares
-from app.core.addresses_service import AddressesService
     
 logger = None
 
@@ -17,21 +16,7 @@ async def lifespan(app: FastAPI):
 
     logger.info(categorize_log("Starting up application", LogCategory.INIT))
     
-    # Инициализация пула соединений для базы данных addresses
-    try:
-        await AddressesService.initialize_pool()
-        logger.info(categorize_log("Addresses service initialized", LogCategory.INIT))
-    except Exception as e:
-        logger.error(categorize_log(f"Failed to initialize addresses service: {e}", LogCategory.ERROR))
-    
     yield
-    
-    # Закрытие пула соединений для базы данных addresses
-    try:
-        await AddressesService.close_pool()
-        logger.info(categorize_log("Addresses service closed", LogCategory.INIT))
-    except Exception as e:
-        logger.error(categorize_log(f"Error closing addresses service: {e}", LogCategory.ERROR))
     
     logger.info(categorize_log("Shutting down application", LogCategory.INIT))
 

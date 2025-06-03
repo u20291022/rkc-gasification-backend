@@ -16,6 +16,7 @@ async def get_municipalities():
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
         ).values_list('id_address', flat=True)
+        
           # Оптимизированный запрос: получаем уникальные id_mo напрямую из БД
         valid_mo_ids = await AddressV2.filter(
             Q(house__isnull=False) &
@@ -27,12 +28,12 @@ async def get_municipalities():
         # Получаем только муниципалитеты с tip = 1, которые есть в списке valid_mo_ids
         municipalities = await Municipality.filter(
             Q(tip=2) &
-            Q(id__in=valid_mo_ids)
+            Q(down_parent_id__in=valid_mo_ids)
         ).all()
         
         log_db_operation("read", "Municipality", {"count": len(municipalities)})
         
-        mo_list = [MunicipalityModel(id=mo.id, name=mo.name) for mo in municipalities]
+        mo_list = [MunicipalityModel(id=mo.down_parent_id, name=mo.name) for mo in municipalities]
         
         return create_response(
             data=MOListResponse(mos=mo_list)
