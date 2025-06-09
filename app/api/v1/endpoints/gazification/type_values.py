@@ -62,8 +62,8 @@ async def get_type_values():
             answers = await FieldAnswer.filter(type_value_id=type_value.id).all()
             answers_size = []
             if answers:
+                answers = [answer.field_answer_value for answer in answers]
                 for answer in answers:
-                    answers.append(answer.field_answer_value)
                     answers_size.append(answer.field_size)
             else:
                 answers = []
