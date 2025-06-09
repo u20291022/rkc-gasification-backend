@@ -60,8 +60,11 @@ async def get_type_values():
                         )
             
             answers = await FieldAnswer.filter(type_value_id=type_value.id).all()
+            answers_size = []
             if answers:
-                answers = [answer.field_answer_value for answer in answers]
+                for answer in answers:
+                    answers.append(answer.field_answer_value)
+                    answers_size.append(answer.field_size)
             else:
                 answers = []
 
@@ -73,7 +76,8 @@ async def get_type_values():
                     description=type_value.description,
                     field_type=field_type_mapping.get(type_value.field_type_id) if type_value.field_type_id else None,
                     related_fields=related_fields,
-                    answers=answers
+                    answers=answers,
+                    answers_size=answers_size
                 )
             )
         

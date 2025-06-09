@@ -54,6 +54,7 @@ class TypeValueModel(BaseModel):
     field_type: str | None = None  # Имя типа поля из таблицы FieldType
     related_fields: list[ValueDependencyModel] = []
     answers: list[str] = []
+    answers_size: list[str] = []
 
 
 class TypeValuesResponse(BaseModel):

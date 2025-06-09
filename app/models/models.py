@@ -93,6 +93,7 @@ class FieldAnswer(models.Model):
     field_answer_id = fields.IntField(primary_key=True)
     field_answer_value = fields.TextField(null=False)
     type_value_id = fields.IntField(null=False)
+    field_size = fields.TextField(null=False)
     
     class Meta:
         schema = "s_gazifikacia"
