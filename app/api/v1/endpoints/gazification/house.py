@@ -5,6 +5,7 @@ from app.schemas.gazification import HouseListResponse
 from app.models.models import AddressV2, GazificationData
 from app.core.exceptions import DatabaseError
 from tortoise.expressions import Q
+from tortoise.functions import Trim
 
 router = APIRouter()
 
@@ -22,26 +23,33 @@ async def get_houses(mo_id: int = Path(), district: str = Path(), street: str = 
         if street == '' or street == 'Нет улиц':
             # Если улица пустая строка, добавляем проверку на NULL
             street_condition = Q(street='') | Q(street__isnull=True)
-          
-        # Оптимизированный запрос: получаем уникальные дома напрямую из БД
+            # Оптимизированный запрос: получаем уникальные дома напрямую из БД
         # для записей с district, соответствующим переданному значению
         district_houses = await AddressV2.filter(
             Q(id_mo=mo_id) &
             street_condition &
             Q(house__isnull=False) &
+            ~Q(house__exact='') &  # Исключаем пустые строки
             Q(district=district) &
             ~Q(id__in=gazified_addresses)
+        ).annotate(
+            house_trimmed=Trim('house')
+        ).exclude(
+            house_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
         ).distinct().values_list(
-            'house', flat=True)
-          
-        # Также получаем дома для записей, где district пустой, но city соответствует district
+            'house', flat=True)            # Также получаем дома для записей, где district пустой, но city соответствует district
         city_houses = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &
             Q(city=district) &
             street_condition &
             Q(house__isnull=False) &
+            ~Q(house__exact='') &  # Исключаем пустые строки
             ~Q(id__in=gazified_addresses)
+        ).annotate(
+            house_trimmed=Trim('house')
+        ).exclude(
+            house_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
         ).distinct().values_list(
             'house', flat=True)
         

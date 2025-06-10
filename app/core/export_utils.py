@@ -90,8 +90,18 @@ async def get_gazification_data(
         normalized_street = street.strip().lower()
         query = query.annotate(
             street_lower=Lower(Trim("street"))
-        ).filter(street_lower=normalized_street)    # Получаем все подходящие адреса
-    addresses = await query.values(
+        ).filter(street_lower=normalized_street)    # Получаем все подходящие адреса с фильтрацией пустых строк и строк с пробелами
+    addresses = await query.annotate(
+        district_trimmed=Trim('district'),
+        city_trimmed=Trim('city'),
+        street_trimmed=Trim('street'),
+        house_trimmed=Trim('house'),
+        flat_trimmed=Trim('flat')
+    ).exclude(
+        # Исключаем записи с пустыми или содержащими только пробелы полями
+        (Q(district_trimmed__exact='') & Q(city_trimmed__exact='')) |
+        Q(house_trimmed__exact='')
+    ).values(
         'id', 'id_mo', 'district', 'city', 'street', 'house', 'flat'
     )
     

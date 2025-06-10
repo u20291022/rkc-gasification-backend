@@ -5,6 +5,7 @@ from app.schemas.gazification import FlatListResponse
 from app.models.models import AddressV2, GazificationData
 from app.core.exceptions import DatabaseError
 from tortoise.expressions import Q
+from tortoise.functions import Trim
 
 router = APIRouter()
 
@@ -15,8 +16,7 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
         # Находим адреса, которые газифицированы (id_type_address = 3)
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
-        ).values_list('id_address', flat=True)
-          # Оптимизированный запрос: получаем уникальные квартиры напрямую из БД
+        ).values_list('id_address', flat=True)        # Оптимизированный запрос: получаем уникальные квартиры напрямую из БД
         # для записей с district, соответствующим переданному значению
         district_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
@@ -24,10 +24,14 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
             Q(house=house) &
             Q(district=district) &
             Q(flat__isnull=False) &
+            ~Q(flat__exact='') &  # Исключаем пустые строки
             ~Q(id__in=gazified_addresses)
+        ).annotate(
+            flat_trimmed=Trim('flat')
+        ).exclude(
+            flat_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
         ).distinct().values_list(
-            'flat', flat=True)
-          # Также получаем квартиры для записей, где district пустой, но city соответствует district
+            'flat', flat=True)        # Также получаем квартиры для записей, где district пустой, но city соответствует district
         city_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &
@@ -35,7 +39,12 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
             Q(street=street) &
             Q(house=house) &
             Q(flat__isnull=False) &
+            ~Q(flat__exact='') &  # Исключаем пустые строки
             ~Q(id__in=gazified_addresses)
+        ).annotate(
+            flat_trimmed=Trim('flat')
+        ).exclude(
+            flat_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
         ).distinct().values_list(
             'flat', flat=True)
         

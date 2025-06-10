@@ -27,10 +27,14 @@ async def get_streets(mo_id: int = Path(), district: str = Path()):
             Q(house__isnull=False) & 
             ~Q(id__in=gazified_addresses)
         ).annotate(
-            district_lower=Lower(Trim("district"))
-        ).filter(
+            district_lower=Lower(Trim("district"))        ).filter(
             Q(district_lower=normalized_district) &
-            Q(street__isnull=False)
+            Q(street__isnull=False) &
+            ~Q(street__exact='')  # Исключаем пустые строки
+        ).annotate(
+            street_trimmed=Trim('street')
+        ).exclude(
+            street_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
         ).distinct().values_list(
             'street', flat=True)
           # Также получаем улицы для записей, где district пустой, но city соответствует district
@@ -40,10 +44,14 @@ async def get_streets(mo_id: int = Path(), district: str = Path()):
             Q(house__isnull=False) & 
             ~Q(id__in=gazified_addresses)
         ).annotate(
-            city_lower=Lower(Trim("city"))
-        ).filter(
+            city_lower=Lower(Trim("city"))        ).filter(
             Q(city_lower=normalized_district) &
-            Q(street__isnull=False)
+            Q(street__isnull=False) &
+            ~Q(street__exact='')  # Исключаем пустые строки
+        ).annotate(
+            street_trimmed=Trim('street')
+        ).exclude(
+            street_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
         ).distinct().values_list(
             'street', flat=True)
         
