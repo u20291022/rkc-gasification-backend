@@ -63,9 +63,9 @@ async def get_gazification_data(
       # Базовый фильтр для адресов (только мобильные)
     # Если есть адреса с газификацией, используем их, иначе берем все мобильные адреса с домами
     if addresses_with_gas_info:
-        base_filter = Q(house__isnull=False) & Q(is_mobile=True) & Q(id__in=addresses_with_gas_info)
+        base_filter = Q(house__isnull=False) & Q(id__in=addresses_with_gas_info)
     else:
-        base_filter = Q(house__isnull=False) & Q(is_mobile=True)
+        base_filter = Q(house__isnull=False)
     
     # Добавляем фильтры на основе переданных параметров
     if mo_id is not None:
