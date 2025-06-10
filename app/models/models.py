@@ -2,6 +2,10 @@ from tortoise import fields, models
 from tortoise.contrib.postgres.fields import ArrayField
 from datetime import datetime, timezone
 
+def get_current_timestamp():
+    """Возвращает текущее время без timezone"""
+    return datetime.now()
+
 
 # Модели для Газификации
 class Municipality(models.Model):
@@ -59,8 +63,13 @@ class GazificationData(models.Model):
     id_type_value = fields.IntField(null=True)
     value = fields.CharField(max_length=256, null=True)  # true/false или текст    date_doc = fields.DateField(null=True)
     date = fields.DateField(null=True)
-    date_create = fields.DatetimeField(auto_now_add=True, auto_now=False)  # Дата создания записи
+    date_create = fields.DatetimeField(auto_now_add=True)  # Автоматически устанавливается при создании
     is_mobile = fields.BooleanField(default=False)
+
+    async def save(self, *args, **kwargs):
+        """Переопределение save для дополнительной логики если нужно"""
+        # Если нужна дополнительная логика при сохранении, добавьте здесь
+        await super().save(*args, **kwargs)
 
     class Meta:
         schema = "s_gazifikacia"

@@ -40,9 +40,7 @@ async def add_address(request: AddressCreateRequest):
                 house=house,
                 flat=flat,
                 is_mobile=True
-            )
-            
-            # Создаем запись о газификации
+            )            # Создаем запись о газификации
             # id_type_address: 3 - подключены к газу, 4 - не подключены
             id_type_address = 3 if request.has_gas else 4
 
