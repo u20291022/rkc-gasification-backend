@@ -5,6 +5,7 @@ from app.schemas.base import BaseResponse
 from app.core.exceptions import DatabaseError
 from app.core.export_utils import get_gazification_data
 from typing import Optional
+from datetime import date
 import pandas as pd
 import tempfile
 import os
@@ -17,33 +18,36 @@ async def export_to_excel(
     mo_id: Optional[int] = Query(None, description="ID муниципалитета"),
     district: Optional[str] = Query(None, description="Название района"),
     street: Optional[str] = Query(None, description="Название улицы"),
+    date_from: Optional[date] = Query(None, description="Начальная дата для фильтрации (YYYY-MM-DD)"),
+    date_to: Optional[date] = Query(None, description="Конечная дата для фильтрации (YYYY-MM-DD)"),
 ):
     """
     Экспорт данных в Excel файл
     
-    Принимает фильтры (муниципалитет, район, улица) и создает Excel-файл с данными.
-    Хотя бы один из параметров должен быть указан.
+    Принимает фильтры (муниципалитет, район, улица, даты) и создает Excel-файл с данными.
+    Если параметры не указаны, выгружаются все данные.
     """
-    # Проверяем, что хотя бы один из параметров указан
-    if mo_id is None and district is None and street is None:
-        raise HTTPException(
-            status_code=400, 
-            detail="Необходимо указать хотя бы один параметр: mo_id, district или street"
+    try:
+        # Получаем данные для экспорта
+        addresses, questions, answers = await get_gazification_data(
+            mo_id, district, street, date_from, date_to
         )
-    try:        # Получаем данные для экспорта
-        addresses, questions, answers = await get_gazification_data(mo_id, district, street)
         
         if not addresses:
             raise HTTPException(
                 status_code=404, 
                 detail="Не найдено данных для экспорта с указанными параметрами"
             )
-        
-        # Создаем DataFrame для экспорта
+          # Создаем DataFrame для экспорта
         data = []
         for address in addresses:
             # Определяем статус газификации
             gas_status = "Да" if address.get('gas_type') == 3 else "Нет"
+            
+            # Форматируем дату создания для отображения
+            date_create_formatted = ""
+            if address.get('date_create'):
+                date_create_formatted = address['date_create'].strftime("%d.%m.%Y %H:%M")
             
             row = {
                 'Муниципалитет': address.get('mo_name', 'Не указан'),
@@ -51,7 +55,8 @@ async def export_to_excel(
                 'Улица': address.get('street', 'Не указана'),
                 'Дом': address.get('house', 'Не указан'),
                 'Квартира': address.get('flat', ''),
-                'Газифицирован?': gas_status
+                'Газифицирован?': gas_status,
+                'Дата создания': date_create_formatted
             }
             
             # Добавляем столбцы для всех вопросов и их ответы
@@ -115,15 +120,17 @@ async def export_to_excel(
             for col_num, column in enumerate(df.columns):
                 column_width = max(df[column].astype(str).map(len).max(), len(column) + 2)
                 worksheet.set_column(col_num, col_num, min(column_width, 50))  # Ограничиваем максимальную ширину
-        
-        log_db_operation("export", "Excel", {
-            "mo_id": mo_id, 
-            "district": district, 
-            "street": street,
-            "rows": len(data),
-            "questions": len(questions),
-            "file": file_path
-        })
+            
+            log_db_operation("export", "Excel", {
+                "mo_id": mo_id, 
+                "district": district, 
+                "street": street,
+                "date_from": date_from.isoformat() if date_from else None,
+                "date_to": date_to.isoformat() if date_to else None,
+                "rows": len(data),
+                "questions": len(questions),
+                "file": file_path
+            })
         
         # Возвращаем файл
         return FileResponse(

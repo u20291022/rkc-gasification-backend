@@ -59,6 +59,7 @@ class GazificationData(models.Model):
     value = fields.CharField(max_length=256, null=True)  # true/false или текст
     date_doc = fields.DateField(null=True)
     date = fields.DateField(null=True)
+    date_create = fields.DatetimeField(null=True, default="CURRENT_TIMESTAMP")  # Дата создания записи
     is_mobile = fields.BooleanField(default=False)
 
     class Meta:

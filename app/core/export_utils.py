@@ -1,13 +1,16 @@
 from tortoise.expressions import Q, Case, When, F
 from tortoise.functions import Lower, Trim
 from typing import Optional, List, Dict, Any, Tuple
+from datetime import date
 from app.models.models import AddressV2, TypeValue, FieldType, GazificationData, Municipality
 from app.core.utils import log_db_operation
 
 async def get_gazification_data(
     mo_id: Optional[int] = None, 
     district: Optional[str] = None, 
-    street: Optional[str] = None
+    street: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
     """
     Получает данные о газификации на основе фильтров
@@ -16,32 +19,55 @@ async def get_gazification_data(
         mo_id: ID муниципалитета (опционально)
         district: Название района (опционально)
         street: Название улицы (опционально)
+        date_from: Начальная дата для фильтрации (опционально)
+        date_to: Конечная дата для фильтрации (опционально)
         
     Returns:
         Tuple[List[Dict], List[Dict], Dict[int, Dict[int, str]]]: (addresses, questions, answers)
             - addresses: список адресов, соответствующих фильтрам
             - questions: список вопросов (TypeValue) для отображения в отчете
             - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса, 
-              ключ внутренний - id вопроса, значение - ответ
-    """    # Находим адреса, которые имеют статус газификации (id_type_address = 3 или 4)
+              ключ внутренний - id вопроса, значение - ответ    """# Находим адреса, которые имеют статус газификации (id_type_address = 3 или 4)
     gazification_status = {}
     
-    # Получаем данные о статусе газификации для адресов
-    gas_status_data = await GazificationData.filter(
-        id_type_address__in=[3, 4]
-    ).values('id_address', 'id_type_address')
+    # Создаем базовый фильтр для данных газификации
+    gas_data_filter = Q(id_type_address__in=[3, 4])
     
-    # Создаем словарь {id_address: id_type_address}
+    # Добавляем фильтрацию по датам, если указаны
+    if date_from:
+        gas_data_filter = gas_data_filter & Q(date_create__gte=date_from)
+    if date_to:
+        gas_data_filter = gas_data_filter & Q(date_create__lte=date_to)
+    
+    # Получаем данные о статусе газификации для адресов
+    gas_status_data = await GazificationData.filter(gas_data_filter).values(
+        'id_address', 'id_type_address', 'date_create'
+    )
+    
+    # Создаем словарь {id_address: {'gas_type': id_type_address, 'date_create': date}}
+    address_gas_info = {}
     for item in gas_status_data:
         address_id = item['id_address']
         type_address = item['id_type_address']
-        gazification_status[address_id] = type_address
+        date_create = item['date_create']
+        
+        # Если для адреса уже есть запись, берем самую новую
+        if address_id not in address_gas_info or date_create > address_gas_info[address_id]['date_create']:
+            address_gas_info[address_id] = {
+                'gas_type': type_address,
+                'date_create': date_create
+            }
+    gazification_status = {addr_id: info['gas_type'] for addr_id, info in address_gas_info.items()}
     
     # Получаем список адресов с информацией о газификации
     addresses_with_gas_info = list(gazification_status.keys())
     
     # Базовый фильтр для адресов
-    base_filter = Q(house__isnull=False) & Q(id__in=addresses_with_gas_info)
+    # Если есть адреса с газификацией, используем их, иначе берем все адреса с домами
+    if addresses_with_gas_info:
+        base_filter = Q(house__isnull=False) & Q(id__in=addresses_with_gas_info)
+    else:
+        base_filter = Q(house__isnull=False)
     
     # Добавляем фильтры на основе переданных параметров
     if mo_id is not None:
@@ -66,8 +92,7 @@ async def get_gazification_data(
         normalized_street = street.strip().lower()
         query = query.annotate(
             street_lower=Lower(Trim("street"))
-        ).filter(street_lower=normalized_street)
-      # Получаем все подходящие адреса
+        ).filter(street_lower=normalized_street)    # Получаем все подходящие адреса
     addresses = await query.values(
         'id', 'id_mo', 'district', 'city', 'street', 'house', 'flat'
     )
@@ -76,10 +101,11 @@ async def get_gazification_data(
         "mo_id": mo_id, 
         "district": district, 
         "street": street,
+        "date_from": date_from.isoformat() if date_from else None,
+        "date_to": date_to.isoformat() if date_to else None,
         "count": len(addresses)
     })
-    
-    # Добавляем информацию о статусе газификации к адресам
+      # Добавляем информацию о статусе газификации к адресам
     for address in addresses:
         if address['street'] == 'Нет улиц':
             address['street'] = ''
@@ -87,6 +113,8 @@ async def get_gazification_data(
         address_id = address['id']
         if address_id in gazification_status:
             address['gas_type'] = gazification_status[address_id]
+        if address_id in address_gas_info:
+            address['date_create'] = address_gas_info[address_id]['date_create']
     
     # Получаем названия муниципалитетов для всех адресов
     mo_ids = {address['id_mo'] for address in addresses if address['id_mo'] is not None}
