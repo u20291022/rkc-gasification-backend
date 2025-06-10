@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from datetime import datetime, timezone
 from app.core.utils import create_response, log_db_operation
 from app.schemas.base import BaseResponse
 from app.schemas.gazification import AddressCreateRequest
@@ -43,7 +44,6 @@ async def add_address(request: AddressCreateRequest):
             )            # Создаем запись о газификации
             # id_type_address: 3 - подключены к газу, 4 - не подключены
             id_type_address = 3 if request.has_gas else 4
-
             await GazificationData.create(
                 id_address=address.id,
                 id_type_address=id_type_address,
