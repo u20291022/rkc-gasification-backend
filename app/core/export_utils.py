@@ -1,5 +1,5 @@
 from tortoise.expressions import Q, Case, When, F
-from tortoise.functions import Lower, Trim
+from tortoise.functions import Lower
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import date
 from app.models.models import AddressV2, TypeValue, FieldType, GazificationData, Municipality
@@ -73,13 +73,12 @@ async def get_gazification_data(
     
     # Строим запрос для получения адресов
     query = AddressV2.filter(base_filter)
-    
-    # Если указан район, добавляем фильтр
+      # Если указан район, добавляем фильтр
     if district:
         normalized_district = district.strip().lower()
         query = query.annotate(
-            district_lower=Lower(Trim("district")),
-            city_lower=Lower(Trim("city"))
+            district_lower=Lower("district"),
+            city_lower=Lower("city")
         ).filter(
             (Q(district_lower=normalized_district)) | 
             (Q(district__isnull=True) & Q(city_lower=normalized_district))
@@ -89,19 +88,9 @@ async def get_gazification_data(
     if street:
         normalized_street = street.strip().lower()
         query = query.annotate(
-            street_lower=Lower(Trim("street"))
-        ).filter(street_lower=normalized_street)    # Получаем все подходящие адреса с фильтрацией пустых строк и строк с пробелами
-    addresses = await query.annotate(
-        district_trimmed=Trim('district'),
-        city_trimmed=Trim('city'),
-        street_trimmed=Trim('street'),
-        house_trimmed=Trim('house'),
-        flat_trimmed=Trim('flat')
-    ).exclude(
-        # Исключаем записи с пустыми или содержащими только пробелы полями
-        (Q(district_trimmed__exact='') & Q(city_trimmed__exact='')) |
-        Q(house_trimmed__exact='')
-    ).values(
+            street_lower=Lower("street")
+        ).filter(street_lower=normalized_street)# Получаем все подходящие адреса
+    addresses = await query.values(
         'id', 'id_mo', 'district', 'city', 'street', 'house', 'flat'
     )
     
@@ -112,9 +101,27 @@ async def get_gazification_data(
         "date_from": date_from.isoformat() if date_from else None,
         "date_to": date_to.isoformat() if date_to else None,
         "count": len(addresses)
-    })
-      # Добавляем информацию о статусе газификации к адресам
+    })    # Добавляем информацию о статусе газификации к адресам и фильтруем на Python
+    filtered_addresses = []
     for address in addresses:
+        # Фильтруем пустые строки и строки с пробелами на Python
+        district = address.get('district', '').strip() if address.get('district') else ''
+        city = address.get('city', '').strip() if address.get('city') else ''
+        street = address.get('street', '').strip() if address.get('street') else ''
+        house = address.get('house', '').strip() if address.get('house') else ''
+        flat = address.get('flat', '').strip() if address.get('flat') else ''
+        
+        # Пропускаем записи где нет ни района, ни города, или нет дома
+        if (not district and not city) or not house:
+            continue
+        
+        # Обновляем данные в адресе
+        address['district'] = district if district else None
+        address['city'] = city if city else None
+        address['street'] = street if street else None
+        address['house'] = house if house else None
+        address['flat'] = flat if flat else None
+        
         if address['street'] == 'Нет улиц':
             address['street'] = ''
 
@@ -123,6 +130,10 @@ async def get_gazification_data(
             address['gas_type'] = gazification_status[address_id]
         if address_id in address_gas_info:
             address['date_create'] = address_gas_info[address_id]['date_create']
+        
+        filtered_addresses.append(address)
+    
+    addresses = filtered_addresses
     
     # Получаем названия муниципалитетов для всех адресов
     mo_ids = {address['id_mo'] for address in addresses if address['id_mo'] is not None}

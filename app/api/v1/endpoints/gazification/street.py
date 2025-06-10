@@ -4,7 +4,6 @@ from app.schemas.base import BaseResponse
 from app.schemas.gazification import StreetListResponse
 from app.models.models import AddressV2, GazificationData
 from app.core.exceptions import DatabaseError
-from tortoise.functions import Lower, Trim
 from tortoise.expressions import Q
 
 router = APIRouter()
@@ -20,43 +19,47 @@ async def get_streets(mo_id: int = Path(), district: str = Path()):
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
         ).values_list('id_address', flat=True)
-          # Оптимизированный запрос: получаем уникальные улицы напрямую из БД
-        # для записей с district, соответствующим переданному значению
+        
+        # Получаем улицы для записей с district, соответствующим переданному значению
         district_streets = await AddressV2.filter(
             Q(id_mo=mo_id) & 
             Q(house__isnull=False) & 
-            ~Q(id__in=gazified_addresses)
-        ).annotate(
-            district_lower=Lower(Trim("district"))        ).filter(
-            Q(district_lower=normalized_district) &
+            Q(district__isnull=False) &
+            ~Q(district__exact='') &
             Q(street__isnull=False) &
-            ~Q(street__exact='')  # Исключаем пустые строки
-        ).annotate(
-            street_trimmed=Trim('street')
-        ).exclude(
-            street_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
-        ).distinct().values_list(
-            'street', flat=True)
-          # Также получаем улицы для записей, где district пустой, но city соответствует district
+            ~Q(street__exact='') &
+            ~Q(id__in=gazified_addresses)
+        ).distinct().values_list('street', 'district', flat=False)
+        
+        # Также получаем улицы для записей, где district пустой, но city соответствует district
         city_streets = await AddressV2.filter(
             Q(id_mo=mo_id) & 
             Q(district__isnull=True) & 
+            Q(city__isnull=False) &
+            ~Q(city__exact='') &
             Q(house__isnull=False) & 
-            ~Q(id__in=gazified_addresses)
-        ).annotate(
-            city_lower=Lower(Trim("city"))        ).filter(
-            Q(city_lower=normalized_district) &
             Q(street__isnull=False) &
-            ~Q(street__exact='')  # Исключаем пустые строки
-        ).annotate(
-            street_trimmed=Trim('street')
-        ).exclude(
-            street_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
-        ).distinct().values_list(
-            'street', flat=True)
+            ~Q(street__exact='') &
+            ~Q(id__in=gazified_addresses)
+        ).distinct().values_list('street', 'city', flat=False)
         
-        # Объединяем результаты
-        all_streets = list(set(list(district_streets) + list(city_streets)))
+        # Фильтруем результаты на Python
+        filtered_streets = []
+        
+        # Обрабатываем улицы из поля district
+        for street, district_name in district_streets:
+            if (street and street.strip() and 
+                district_name and district_name.strip().lower() == normalized_district):
+                filtered_streets.append(street.strip())
+        
+        # Обрабатываем улицы из поля city
+        for street, city_name in city_streets:
+            if (street and street.strip() and 
+                city_name and city_name.strip().lower() == normalized_district):
+                filtered_streets.append(street.strip())
+        
+        # Убираем дубликаты
+        all_streets = list(set(filtered_streets))
         
         if not all_streets:
             all_streets.append('Нет улиц')

@@ -5,7 +5,6 @@ from app.schemas.gazification import FlatListResponse
 from app.models.models import AddressV2, GazificationData
 from app.core.exceptions import DatabaseError
 from tortoise.expressions import Q
-from tortoise.functions import Trim
 
 router = APIRouter()
 
@@ -16,40 +15,50 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
         # Находим адреса, которые газифицированы (id_type_address = 3)
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
-        ).values_list('id_address', flat=True)        # Оптимизированный запрос: получаем уникальные квартиры напрямую из БД
-        # для записей с district, соответствующим переданному значению
+        ).values_list('id_address', flat=True)
+        
+        # Получаем квартиры для записей с district, соответствующим переданному значению
         district_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(street=street) &
             Q(house=house) &
-            Q(district=district) &
+            Q(district__isnull=False) &
+            ~Q(district__exact='') &
             Q(flat__isnull=False) &
-            ~Q(flat__exact='') &  # Исключаем пустые строки
+            ~Q(flat__exact='') &
             ~Q(id__in=gazified_addresses)
-        ).annotate(
-            flat_trimmed=Trim('flat')
-        ).exclude(
-            flat_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
-        ).distinct().values_list(
-            'flat', flat=True)        # Также получаем квартиры для записей, где district пустой, но city соответствует district
+        ).distinct().values_list('flat', 'district', flat=False)
+        
+        # Также получаем квартиры для записей, где district пустой, но city соответствует district
         city_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &
-            Q(city=district) &
+            Q(city__isnull=False) &
+            ~Q(city__exact='') &
             Q(street=street) &
             Q(house=house) &
             Q(flat__isnull=False) &
-            ~Q(flat__exact='') &  # Исключаем пустые строки
+            ~Q(flat__exact='') &
             ~Q(id__in=gazified_addresses)
-        ).annotate(
-            flat_trimmed=Trim('flat')
-        ).exclude(
-            flat_trimmed__exact=''  # Исключаем строки, содержащие только пробелы
-        ).distinct().values_list(
-            'flat', flat=True)
+        ).distinct().values_list('flat', 'city', flat=False)
         
-        # Объединяем результаты
-        all_flats = list(set(list(district_flats) + list(city_flats)))
+        # Фильтруем результаты на Python
+        filtered_flats = []
+        
+        # Обрабатываем квартиры из записей с district
+        for flat, district_name in district_flats:
+            if (flat and flat.strip() and 
+                district_name and district_name.strip() == district):
+                filtered_flats.append(flat.strip())
+        
+        # Обрабатываем квартиры из записей с city
+        for flat, city_name in city_flats:
+            if (flat and flat.strip() and 
+                city_name and city_name.strip() == district):
+                filtered_flats.append(flat.strip())
+        
+        # Убираем дубликаты
+        all_flats = list(set(filtered_flats))
         
         log_db_operation("read", "AddressV2", {
             "mo_id": mo_id, 
