@@ -21,7 +21,7 @@ async def get_districts(mo_id: int = Path()):
             Q(id_mo=mo_id) &
             Q(house__isnull=False) &
             Q(district__isnull=False) &
-            ~Q(district__exact='') &
+            ~Q(district='') &
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list('district', flat=True)
         
@@ -31,7 +31,7 @@ async def get_districts(mo_id: int = Path()):
             Q(house__isnull=False) &
             Q(district__isnull=True) &
             Q(city__isnull=False) &
-            ~Q(city__exact='') &
+            ~Q(city='') &
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list('city', flat=True)
         

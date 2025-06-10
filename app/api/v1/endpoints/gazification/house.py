@@ -22,15 +22,14 @@ async def get_houses(mo_id: int = Path(), district: str = Path(), street: str = 
         if street == '' or street == 'Нет улиц':
             # Если улица пустая строка, добавляем проверку на NULL
             street_condition = Q(street='') | Q(street__isnull=True)
-        
-        # Получаем дома для записей с district, соответствующим переданному значению
+          # Получаем дома для записей с district, соответствующим переданному значению
         district_houses = await AddressV2.filter(
             Q(id_mo=mo_id) &
             street_condition &
             Q(house__isnull=False) &
-            ~Q(house__exact='') &
+            ~Q(house='') &
             Q(district__isnull=False) &
-            ~Q(district__exact='') &
+            ~Q(district='') &
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list('house', 'district', flat=False)
         
@@ -39,10 +38,10 @@ async def get_houses(mo_id: int = Path(), district: str = Path(), street: str = 
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &
             Q(city__isnull=False) &
-            ~Q(city__exact='') &
+            ~Q(city='') &
             street_condition &
             Q(house__isnull=False) &
-            ~Q(house__exact='') &
+            ~Q(house='') &
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list('house', 'city', flat=False)
         

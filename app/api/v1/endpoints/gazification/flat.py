@@ -16,16 +16,15 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
         ).values_list('id_address', flat=True)
-        
-        # Получаем квартиры для записей с district, соответствующим переданному значению
+          # Получаем квартиры для записей с district, соответствующим переданному значению
         district_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(street=street) &
             Q(house=house) &
             Q(district__isnull=False) &
-            ~Q(district__exact='') &
+            ~Q(district='') &
             Q(flat__isnull=False) &
-            ~Q(flat__exact='') &
+            ~Q(flat='') &
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list('flat', 'district', flat=False)
         
@@ -34,11 +33,11 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &
             Q(city__isnull=False) &
-            ~Q(city__exact='') &
+            ~Q(city='') &
             Q(street=street) &
             Q(house=house) &
             Q(flat__isnull=False) &
-            ~Q(flat__exact='') &
+            ~Q(flat='') &
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list('flat', 'city', flat=False)
         
