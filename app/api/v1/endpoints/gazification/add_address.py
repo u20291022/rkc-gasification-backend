@@ -18,14 +18,27 @@ async def add_address(request: AddressCreateRequest):
             raise DatabaseError(f"Не найден тип значения с id=1: {str(e)}")
         
         async with in_transaction() as conn:
+            # Обрабатываем строковые поля: убираем пробелы и меняем пустые строки на None
+            district = request.district.strip() if request.district else None
+            district = district if district else None
+            
+            street = request.street.strip() if request.street else None
+            street = street if street else None
+            
+            house = request.house.strip() if request.house else None
+            house = house if house else None
+            
+            flat = request.flat.strip() if request.flat else None
+            flat = flat if flat else None
+            
             # Создаем новую запись в таблице адресов
             address = await AddressV2.create(
                 id_mo=request.mo_id,
-                district=request.district,
-                city=request.district,
-                street=request.street,
-                house=request.house,
-                flat=request.flat,
+                district=district,
+                city=district,  # используем district как city
+                street=street,
+                house=house,
+                flat=flat,
                 is_mobile=True
             )
             
