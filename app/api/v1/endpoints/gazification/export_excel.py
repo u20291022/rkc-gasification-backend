@@ -50,13 +50,13 @@ async def export_to_excel(
                 date_create_formatted = address['date_create'].strftime("%d.%m.%Y %H:%M")
             
             row = {
+                'Дата создания': date_create_formatted,
                 'Муниципалитет': address.get('mo_name', 'Не указан'),
                 'Район': address.get('district') or address.get('city') or 'Не указан',
                 'Улица': address.get('street', 'Не указана'),
                 'Дом': address.get('house', 'Не указан'),
                 'Квартира': address.get('flat', ''),
                 'Газифицирован?': gas_status,
-                'Дата создания': date_create_formatted
             }
             
             # Добавляем столбцы для всех вопросов и их ответы
