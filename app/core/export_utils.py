@@ -29,9 +29,8 @@ async def get_gazification_data(
             - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса, 
               ключ внутренний - id вопроса, значение - ответ    """# Находим адреса, которые имеют статус газификации (id_type_address = 3 или 4)
     gazification_status = {}
-    
-    # Создаем базовый фильтр для данных газификации
-    gas_data_filter = Q(id_type_address__in=[3, 4])
+      # Создаем базовый фильтр для данных газификации (только мобильные)
+    gas_data_filter = Q(id_type_address__in=[3, 4]) & Q(is_mobile=True)
     
     # Добавляем фильтрацию по датам, если указаны
     if date_from:
@@ -61,13 +60,12 @@ async def get_gazification_data(
     
     # Получаем список адресов с информацией о газификации
     addresses_with_gas_info = list(gazification_status.keys())
-    
-    # Базовый фильтр для адресов
-    # Если есть адреса с газификацией, используем их, иначе берем все адреса с домами
+      # Базовый фильтр для адресов (только мобильные)
+    # Если есть адреса с газификацией, используем их, иначе берем все мобильные адреса с домами
     if addresses_with_gas_info:
-        base_filter = Q(house__isnull=False) & Q(id__in=addresses_with_gas_info)
+        base_filter = Q(house__isnull=False) & Q(is_mobile=True) & Q(id__in=addresses_with_gas_info)
     else:
-        base_filter = Q(house__isnull=False)
+        base_filter = Q(house__isnull=False) & Q(is_mobile=True)
     
     # Добавляем фильтры на основе переданных параметров
     if mo_id is not None:
@@ -149,12 +147,12 @@ async def get_gazification_data(
             address['mo_name'] = mo_names[mo_id]
         else:
             address['mo_name'] = "Неизвестный муниципалитет"
-    
-    # Получаем ответы на вопросы для найденных адресов
+      # Получаем ответы на вопросы для найденных адресов (только мобильные)
     address_ids = [address['id'] for address in addresses]
     answers_data = await GazificationData.filter(
         id_address__in=address_ids,
-        id_type_value__isnull=False
+        id_type_value__isnull=False,
+        is_mobile=True
     ).values('id_address', 'id_type_value', 'value')
     
     # Форматируем ответы в виде словаря {id_address: {id_type_value: value}}
