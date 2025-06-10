@@ -1,10 +1,5 @@
 from tortoise import fields, models
 from tortoise.contrib.postgres.fields import ArrayField
-from datetime import datetime, timezone
-
-def get_current_timestamp():
-    """Возвращает текущее время без timezone"""
-    return datetime.now()
 
 
 # Модели для Газификации
@@ -61,17 +56,10 @@ class GazificationData(models.Model):
     id_address = fields.IntField()
     id_type_address = fields.IntField(null=False)  # 3 - подключены к газу, 4 - не подключены
     id_type_value = fields.IntField(null=True)
-    value = fields.CharField(max_length=256, null=True)  # true/false или текст
-    date_doc = fields.DateField(null=True)
+    value = fields.CharField(max_length=256, null=True)  # true/false или текст    date_doc = fields.DateField(null=True)
     date = fields.DateField(null=True)
-    date_create = fields.DatetimeField(default=get_current_timestamp, null=True)  # Автоматически устанавливается при создании с UTC timezone
+    date_create = fields.DatetimeField(auto_now_add=True)  # Дата создания записи
     is_mobile = fields.BooleanField(default=False)
-    async def save(self, *args, **kwargs):
-        """Переопределение save для автоматического задания date_create"""
-        # Если это новая запись (нет id) и date_create не задан, устанавливаем текущее время
-        if not self.id and not self.date_create:
-            self.date_create = get_current_timestamp()
-        await super().save(*args, **kwargs)
 
     class Meta:
         schema = "s_gazifikacia"
