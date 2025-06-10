@@ -1,5 +1,6 @@
 from tortoise import fields, models
 from tortoise.contrib.postgres.fields import ArrayField
+from datetime import datetime, timezone
 
 
 # Модели для Газификации
@@ -58,7 +59,7 @@ class GazificationData(models.Model):
     id_type_value = fields.IntField(null=True)
     value = fields.CharField(max_length=256, null=True)  # true/false или текст    date_doc = fields.DateField(null=True)
     date = fields.DateField(null=True)
-    date_create = fields.DatetimeField(auto_now_add=True)  # Дата создания записи
+    date_create = fields.DatetimeField(auto_now_add=True, auto_now=False)  # Дата создания записи
     is_mobile = fields.BooleanField(default=False)
 
     class Meta:

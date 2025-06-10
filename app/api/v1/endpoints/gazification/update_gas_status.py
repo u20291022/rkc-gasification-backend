@@ -44,15 +44,15 @@ async def update_gas_status(request: UpdateGasStatusRequest):
             async with in_transaction() as conn:
                 # id_type_address: 3 - подключены к газу, 4 - не подключены
                 id_type_address = 3 if request.has_gas else 4
-                
-                # Находим запись о газификации для данного адреса или создаем новую
+                  # Находим запись о газификации для данного адреса или создаем новую
                 gazification_data = await GazificationData.filter(id_address=address.id).all()
                 
                 if gazification_data:
                     # Обновляем существующую запись
                     for gaz_data_curr in gazification_data:
                         gaz_data_curr.id_type_address = id_type_address
-                        await gaz_data_curr.save()
+                        # Обновляем только поле id_type_address, не трогая date_create
+                        await gaz_data_curr.save(update_fields=['id_type_address'])
                 else:
                     # Создаем новую запись о газификации
                     await GazificationData.create(
