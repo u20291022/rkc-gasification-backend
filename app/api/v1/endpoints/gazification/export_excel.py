@@ -10,6 +10,7 @@ import pandas as pd
 import tempfile
 import os
 from datetime import datetime
+from datetime import timedelta
 
 router = APIRouter()
 
@@ -72,7 +73,8 @@ async def export_to_excel(
               # Форматируем дату создания для отображения (дата и время)
             date_create_formatted = None
             if address.get('date_create'):
-                date_create_formatted = address['date_create'].strftime("%d.%m.%Y %H:%M")
+                date_with_offset = address['date_create'] + timedelta(hours=7)
+                date_create_formatted = date_with_offset.strftime("%d.%m.%Y %H:%M")
             
             row = {
                 'Дата создания': date_create_formatted,
