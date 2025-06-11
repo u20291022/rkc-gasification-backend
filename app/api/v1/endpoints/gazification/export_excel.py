@@ -68,11 +68,10 @@ async def export_to_excel(
         for address in unique_addresses.values():
             # Определяем статус газификации
             gas_status = "Да" if address.get('gas_type') == 3 else "Нет"
-            
-            # Форматируем дату создания для отображения (только дата, без времени)
+              # Форматируем дату создания для отображения (дата и время)
             date_create_formatted = None
             if address.get('date_create'):
-                date_create_formatted = address['date_create'].strftime("%d.%m.%Y")
+                date_create_formatted = address['date_create'].strftime("%d.%m.%Y %H:%M")
             
             row = {
                 'Дата создания': date_create_formatted,
@@ -129,11 +128,10 @@ async def export_to_excel(
                 'border': 1,
                 'text_wrap': True
             })
-            
-            # Формат для столбца с датами
+              # Формат для столбца с датами
             date_format = workbook.add_format({
                 'border': 1,
-                'num_format': 'dd.mm.yyyy'
+                'num_format': 'dd.mm.yyyy hh:mm'
             })
             
             # Применяем форматирование к заголовкам
@@ -146,13 +144,12 @@ async def export_to_excel(
                 for col_num in range(len(df.columns)):
                     column_name = df.columns[col_num]
                     cell_value = df.iloc[row_num-1, col_num]
-                    
-                    # Для столбца "Дата создания" применяем формат даты
+                      # Для столбца "Дата создания" применяем формат даты
                     if column_name == 'Дата создания' and cell_value:
                         # Преобразуем строку даты обратно в datetime для Excel
                         try:
                             if isinstance(cell_value, str) and cell_value:
-                                date_obj = datetime.strptime(cell_value, "%d.%m.%Y")
+                                date_obj = datetime.strptime(cell_value, "%d.%m.%Y %H:%M")
                                 worksheet.write(row_num, col_num, date_obj, date_format)
                             else:
                                 worksheet.write(row_num, col_num, cell_value, cell_format)
