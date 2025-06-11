@@ -12,11 +12,10 @@ router = APIRouter()
 async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = Path(), house: str = Path()):
     """Получение списка квартир по ID муниципалитета, району, улице и дому"""
     try:
-        # Находим адреса, которые газифицированы (id_type_address = 3)
         gazified_addresses = await GazificationData.filter(
             id_type_address=3
         ).values_list('id_address', flat=True)
-          # Получаем квартиры для записей с district, соответствующим переданному значению
+        
         district_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(street=street) &
@@ -28,7 +27,6 @@ async def get_flats(mo_id: int = Path(), district: str = Path(), street: str = P
             ~Q(id__in=gazified_addresses)
         ).distinct().values_list('flat', 'district', flat=False)
         
-        # Также получаем квартиры для записей, где district пустой, но city соответствует district
         city_flats = await AddressV2.filter(
             Q(id_mo=mo_id) &
             Q(district__isnull=True) &

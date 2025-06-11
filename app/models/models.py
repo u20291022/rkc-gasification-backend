@@ -8,14 +8,14 @@ class Municipality(models.Model):
     id = fields.IntField(primary_key=True)
     name = fields.CharField(max_length=128, null=False)
     down_parent_id = fields.IntField(null=True)
-    tip = fields.IntField(null=False)  # Только где tip = 2
+    tip = fields.IntField(null=False)
     id_parent = fields.IntField(null=True)
     path_id = ArrayField(null=False)
     level_parent = fields.IntField(null=False)
     
     class Meta:
         schema = "sp_s_subekty"
-        table = "v_all_name_mo" # Используем представление из схемы sp_s_subekty
+        table = "v_all_name_mo"
 
 
 class AddressV2(models.Model):
@@ -54,11 +54,11 @@ class GazificationData(models.Model):
     """Модель для данных о газификации"""
     id = fields.IntField(primary_key=True)
     id_address = fields.IntField()
-    id_type_address = fields.IntField(null=False)  # 3 - подключены к газу, 4 - не подключены
+    id_type_address = fields.IntField(null=False)
     id_type_value = fields.IntField(null=True)
-    value = fields.CharField(max_length=256, null=True)  # true/false или текст    date_doc = fields.DateField(null=True)
+    value = fields.CharField(max_length=256, null=True)
     date = fields.DateField(null=True)
-    date_create = fields.DatetimeField(auto_now_add=True)  # Дата создания записи
+    date_create = fields.DatetimeField(auto_now_add=True)
     is_mobile = fields.BooleanField(default=False)
 
     class Meta:

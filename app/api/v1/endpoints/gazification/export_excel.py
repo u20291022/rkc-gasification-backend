@@ -37,17 +37,42 @@ async def export_to_excel(
             raise HTTPException(
                 status_code=404, 
                 detail="Не найдено данных для экспорта с указанными параметрами"
-            )
-          # Создаем DataFrame для экспорта
-        data = []
+            )        # Создаем DataFrame для экспорта
+        # Сначала создаем словарь для отслеживания уникальных адресов
+        unique_addresses = {}
+        
         for address in addresses:
+            # Создаем ключ для идентификации уникального адреса
+            address_key = (
+                address.get('id_mo'),
+                address.get('district', '').strip().lower(),
+                address.get('city', '').strip().lower(), 
+                address.get('street', '').strip().lower(),
+                address.get('house', '').strip().lower(),
+                address.get('flat', '').strip().lower()
+            )
+            
+            # Если адрес уже есть, сравниваем даты и оставляем более свежий
+            if address_key in unique_addresses:
+                existing_date = unique_addresses[address_key].get('date_create')
+                current_date = address.get('date_create')
+                
+                # Если у текущего адреса дата новее (или у существующего нет даты)
+                if current_date and (not existing_date or current_date > existing_date):
+                    unique_addresses[address_key] = address
+            else:
+                unique_addresses[address_key] = address
+        
+        # Создаем данные для экспорта из уникальных адресов
+        data = []
+        for address in unique_addresses.values():
             # Определяем статус газификации
             gas_status = "Да" if address.get('gas_type') == 3 else "Нет"
             
-            # Форматируем дату создания для отображения
-            date_create_formatted = ""
+            # Форматируем дату создания для отображения (только дата, без времени)
+            date_create_formatted = None
             if address.get('date_create'):
-                date_create_formatted = address['date_create'].strftime("%d.%m.%Y %H:%M")
+                date_create_formatted = address['date_create'].strftime("%d.%m.%Y")
             
             row = {
                 'Дата создания': date_create_formatted,
@@ -90,8 +115,7 @@ async def export_to_excel(
             # Форматирование
             workbook = writer.book
             worksheet = writer.sheets['Газификация']
-            
-            # Форматы для заголовков и ячеек
+              # Форматы для заголовков и ячеек
             header_format = workbook.add_format({
                 'bold': True,
                 'text_wrap': True,
@@ -106,6 +130,12 @@ async def export_to_excel(
                 'text_wrap': True
             })
             
+            # Формат для столбца с датами
+            date_format = workbook.add_format({
+                'border': 1,
+                'num_format': 'dd.mm.yyyy'
+            })
+            
             # Применяем форматирование к заголовкам
             for col_num, value in enumerate(df.columns.values):
                 worksheet.write(0, col_num, value, header_format)
@@ -114,7 +144,22 @@ async def export_to_excel(
             # Применяем форматирование к ячейкам
             for row_num in range(1, len(df) + 1):
                 for col_num in range(len(df.columns)):
-                    worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], cell_format)
+                    column_name = df.columns[col_num]
+                    cell_value = df.iloc[row_num-1, col_num]
+                    
+                    # Для столбца "Дата создания" применяем формат даты
+                    if column_name == 'Дата создания' and cell_value:
+                        # Преобразуем строку даты обратно в datetime для Excel
+                        try:
+                            if isinstance(cell_value, str) and cell_value:
+                                date_obj = datetime.strptime(cell_value, "%d.%m.%Y")
+                                worksheet.write(row_num, col_num, date_obj, date_format)
+                            else:
+                                worksheet.write(row_num, col_num, cell_value, cell_format)
+                        except:
+                            worksheet.write(row_num, col_num, cell_value, cell_format)
+                    else:
+                        worksheet.write(row_num, col_num, cell_value, cell_format)
             
             # Автоподбор ширины столбцов
             for col_num, column in enumerate(df.columns):
