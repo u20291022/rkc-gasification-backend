@@ -27,8 +27,7 @@ async def export_to_excel(
     Принимает фильтры (муниципалитет, район, улица, даты) и создает Excel-файл с данными.
     Если параметры не указаны, выгружаются все данные.
     """
-    try:
-        # Получаем данные для экспорта
+    try:        # Получаем данные для экспорта
         addresses, questions, answers = await get_gazification_data(
             mo_id, district, street, date_from, date_to
         )
@@ -37,7 +36,9 @@ async def export_to_excel(
             raise HTTPException(
                 status_code=404, 
                 detail="Не найдено данных для экспорта с указанными параметрами"
-            )        # Создаем DataFrame для экспорта
+            )
+        
+        # Создаем DataFrame для экспорта
         # Сначала создаем словарь для отслеживания уникальных адресов
         unique_addresses = {}
         
@@ -45,11 +46,11 @@ async def export_to_excel(
             # Создаем ключ для идентификации уникального адреса
             address_key = (
                 address.get('id_mo'),
-                address.get('district', '').strip().lower(),
-                address.get('city', '').strip().lower(), 
-                address.get('street', '').strip().lower(),
-                address.get('house', '').strip().lower(),
-                address.get('flat', '').strip().lower()
+                (address.get('district') or '').strip().lower(),
+                (address.get('city') or '').strip().lower(), 
+                (address.get('street') or '').strip().lower(),
+                (address.get('house') or '').strip().lower(),
+                (address.get('flat') or '').strip().lower()
             )
             
             # Если адрес уже есть, сравниваем даты и оставляем более свежий
