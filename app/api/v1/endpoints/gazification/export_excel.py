@@ -76,14 +76,14 @@ async def export_to_excel(
             
             row = {
                 'Дата создания': date_create_formatted,
+                'Создатель адреса': address.get('from_login') or 'Отсутствует',
+                'Отправитель': address.get('gas_from_login') or 'Отсутствует',
                 'Муниципалитет': address.get('mo_name', 'Не указан'),
                 'Район': address.get('district') or address.get('city') or 'Не указан',
                 'Улица': address.get('street', 'Не указана'),
                 'Дом': address.get('house', 'Не указан'),
                 'Квартира': address.get('flat', ''),
                 'Газифицирован?': gas_status,
-                'Создатель адреса': address.get('from_login') or 'Отсутствует',
-                'Отправитель': address.get('gas_from_login') or 'Отсутствует',
             }
             
             # Добавляем столбцы для всех вопросов и их ответы
