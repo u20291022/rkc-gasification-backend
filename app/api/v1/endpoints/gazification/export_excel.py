@@ -28,7 +28,7 @@ async def export_to_excel(
     Принимает фильтры (муниципалитет, район, улица, даты) и создает Excel-файл с данными.
     Если параметры не указаны, выгружаются все данные.
     """
-    try:        # Получаем данные для экспорта
+    try:
         addresses, questions, answers = await get_gazification_data(
             mo_id, district, street, date_from, date_to
         )
@@ -68,9 +68,7 @@ async def export_to_excel(
         # Создаем данные для экспорта из уникальных адресов
         data = []
         for address in unique_addresses.values():
-            # Определяем статус газификации
             gas_status = "Да" if address.get('gas_type') == 3 else "Нет"
-              # Форматируем дату создания для отображения (дата и время)
             date_create_formatted = None
             if address.get('date_create'):
                 date_with_offset = address['date_create'] + timedelta(hours=7)
@@ -84,6 +82,8 @@ async def export_to_excel(
                 'Дом': address.get('house', 'Не указан'),
                 'Квартира': address.get('flat', ''),
                 'Газифицирован?': gas_status,
+                'Создатель адреса': address.get('from_login') or 'Отсутствует',
+                'Отправитель': address.get('gas_from_login') or 'Отсутствует',
             }
             
             # Добавляем столбцы для всех вопросов и их ответы

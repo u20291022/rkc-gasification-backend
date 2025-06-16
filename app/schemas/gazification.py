@@ -70,6 +70,7 @@ class AddressCreateRequest(BaseModel):
     house: str
     flat: str | None = None
     has_gas: bool
+    from_login: str | None = None
 
 
 class UpdateGasStatusRequest(BaseModel):
@@ -80,6 +81,7 @@ class UpdateGasStatusRequest(BaseModel):
     house: str
     flat: str | None = None
     has_gas: bool
+    from_login: str | None = None
 
 
 class AddressModel(BaseModel):
@@ -101,3 +103,4 @@ class GazificationUploadRequest(BaseModel):
     """Запрос на отправку записи"""
     address: AddressModel
     fields: list[FieldModel]
+    from_login: str | None = None

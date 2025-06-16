@@ -30,6 +30,7 @@ class AddressV2(models.Model):
     id_parent = fields.IntField(null=True)
     mkd = fields.BooleanField(default=False)
     is_mobile = fields.BooleanField(default=False)
+    from_login = fields.TextField(null=True)
     
     class Meta:
         schema = "s_gazifikacia"
@@ -60,6 +61,7 @@ class GazificationData(models.Model):
     date = fields.DateField(null=True)
     date_create = fields.DatetimeField(auto_now_add=True)
     is_mobile = fields.BooleanField(default=False)
+    from_login = fields.TextField(null=True)
 
     class Meta:
         schema = "s_gazifikacia"

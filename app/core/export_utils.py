@@ -37,24 +37,24 @@ async def get_gazification_data(
         gas_data_filter = gas_data_filter & Q(date_create__gte=date_from)
     if date_to:
         gas_data_filter = gas_data_filter & Q(date_create__lte=date_to)
-    
-    # Получаем данные о статусе газификации для адресов
+      # Получаем данные о статусе газификации для адресов
     gas_status_data = await GazificationData.filter(gas_data_filter).values(
-        'id_address', 'id_type_address', 'date_create'
+        'id_address', 'id_type_address', 'date_create', 'from_login'
     )
-    
-    # Создаем словарь {id_address: {'gas_type': id_type_address, 'date_create': date}}
+      # Создаем словарь {id_address: {'gas_type': id_type_address, 'date_create': date, 'from_login': from_login}}
     address_gas_info = {}
     for item in gas_status_data:
         address_id = item['id_address']
         type_address = item['id_type_address']
         date_create = item['date_create']
+        from_login = item['from_login']
         
         # Если для адреса уже есть запись, берем самую новую
         if address_id not in address_gas_info or date_create > address_gas_info[address_id]['date_create']:
             address_gas_info[address_id] = {
                 'gas_type': type_address,
-                'date_create': date_create
+                'date_create': date_create,
+                'from_login': from_login
             }
     gazification_status = {addr_id: info['gas_type'] for addr_id, info in address_gas_info.items()}
     
@@ -89,9 +89,9 @@ async def get_gazification_data(
         normalized_street = street.strip().lower()
         query = query.annotate(
             street_lower=Lower("street")
-        ).filter(street_lower=normalized_street)# Получаем все подходящие адреса
+        ).filter(street_lower=normalized_street)    # Получаем все подходящие адреса
     addresses = await query.values(
-        'id', 'id_mo', 'district', 'city', 'street', 'house', 'flat'
+        'id', 'id_mo', 'district', 'city', 'street', 'house', 'flat', 'from_login'
     )
     
     log_db_operation("read", "AddressV2", {
@@ -121,7 +121,6 @@ async def get_gazification_data(
         address['street'] = street if street else None
         address['house'] = house if house else None
         address['flat'] = flat if flat else None
-        
         if address['street'] == 'Нет улиц':
             address['street'] = ''
 
@@ -130,6 +129,7 @@ async def get_gazification_data(
             address['gas_type'] = gazification_status[address_id]
         if address_id in address_gas_info:
             address['date_create'] = address_gas_info[address_id]['date_create']
+            address['gas_from_login'] = address_gas_info[address_id]['from_login']
         
         filtered_addresses.append(address)
     

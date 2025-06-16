@@ -47,7 +47,8 @@ async def upload_gazification_data(request: GazificationUploadRequest):
                     street=request.address.street,
                     house=request.address.house,
                     flat=request.address.flat,
-                    is_mobile=True
+                    is_mobile=True,
+                    from_login=request.from_login
                 )
                 log_db_operation("create", "AddressV2", {
                     "address_id": address.id,
@@ -65,7 +66,8 @@ async def upload_gazification_data(request: GazificationUploadRequest):
                     id_type_address=4,  # 4 - не подключены (для полей из формы)
                     id_type_value=type_value.id,
                     value=field.value,
-                    is_mobile=True
+                    is_mobile=True,
+                    from_login=request.from_login
                 )
             
             log_db_operation("create", "GazificationData", {
