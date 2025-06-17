@@ -42,8 +42,12 @@ async def update_gas_status(request: UpdateGasStatusRequest):
         for address in addresses:
             async with in_transaction() as conn:
                 # id_type_address: 3 - подключены к газу, 4 - не подключены
-                id_type_address = 3 if request.has_gas else 4
-                
+                id_type_address = 4
+                if request.has_gas == 'true':
+                    id_type_address = 3
+                elif request.has_gas == 'not_exist':
+                    id_type_address = 6
+
                 # Находим запись о газификации для данного адреса или создаем новую
                 gazification_data = await GazificationData.filter(id_address=address.id).all()
                 

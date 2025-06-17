@@ -80,7 +80,7 @@ class UpdateGasStatusRequest(BaseModel):
     street: str
     house: str
     flat: str | None = None
-    has_gas: bool
+    has_gas: str
     from_login: str | None = None
 
 
