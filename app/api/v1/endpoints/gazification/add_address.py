@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from datetime import datetime, timezone
-from app.core.utils import create_response, log_db_operation
+from app.core.utils import create_response, log_db_operation, record_activity
 from app.schemas.base import BaseResponse
 from app.schemas.gazification import AddressCreateRequest
 from app.models.models import AddressV2, GazificationData, TypeValue
@@ -48,8 +48,7 @@ async def add_address(request: AddressCreateRequest):
                 id_address=address.id,
                 id_type_address=id_type_address,
                 is_mobile=True,
-                from_login=request.from_login
-            )
+                from_login=request.from_login            )
             
             log_db_operation("create", "AddressV2 and GazificationData", {
                 "mo_id": request.mo_id,
@@ -58,6 +57,9 @@ async def add_address(request: AddressCreateRequest):
                 "house": request.house,
                 "has_gas": request.has_gas
             })
+            
+            # Записываем активность пользователя
+            await record_activity(request.from_login or "unknown", request.session_id)
         
         return create_response(
             data=None,

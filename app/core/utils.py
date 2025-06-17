@@ -68,3 +68,35 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 def log_db_operation(operation: str, model: str, extra: Optional[dict[str, Any]] = None):
     logger.info(categorize_log(f"DB {operation}: {model}", LogCategory.DB), extra=extra or {})
+
+
+async def record_activity(email: str, session_id: str):
+    """Записывает или обновляет активность пользователя"""
+    if not session_id:
+        return
+        
+    from app.models.models import Activity
+    
+    try:
+        # Пытаемся найти существующую запись
+        activity = await Activity.get_or_none(session_id=session_id)
+        
+        if activity:
+            # Увеличиваем счетчик
+            activity.activity_count += 1
+            await activity.save(update_fields=['activity_count'])
+        else:
+            # Создаем новую запись
+            await Activity.create(
+                session_id=session_id,
+                email=email,
+                activity_count=1
+            )
+            
+        log_db_operation("activity", "Activity", {
+            "session_id": session_id,
+            "email": email,
+            "action": "increment" if activity else "create"
+        })
+    except Exception as e:
+        logger.error(f"Error recording activity: {str(e)}", exc_info=True)

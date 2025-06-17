@@ -197,3 +197,38 @@ async def get_gazification_data(
     log_db_operation("read", "GazificationData", {"count": len(answers_data)})
     
     return addresses, questions, answers
+
+
+async def get_activity_data(
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None
+) -> List[Dict[str, Any]]:
+    """
+    Получает данные активности пользователей
+    
+    Args:
+        date_from: Начальная дата для фильтрации (опционально)
+        date_to: Конечная дата для фильтрации (опционально)
+        
+    Returns:
+        List[Dict[str, Any]]: список записей активности
+    """
+    from app.models.models import Activity
+    
+    # Создаем базовый запрос
+    query = Activity.all()
+    
+    # Добавляем фильтрацию по датам, если указаны
+    if date_from:
+        query = query.filter(date_create__gte=date_from)
+    if date_to:
+        query = query.filter(date_create__lte=date_to)
+    
+    # Получаем данные и сортируем по дате создания (по убыванию)
+    activities = await query.order_by('-date_create').values(
+        'email', 'activity_count', 'date_create'
+    )
+    
+    log_db_operation("read", "Activity", {"count": len(activities)})
+    
+    return activities

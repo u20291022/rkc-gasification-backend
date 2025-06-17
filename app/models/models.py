@@ -110,3 +110,15 @@ class User(models.Model):
     class Meta:
         schema = "s_gazifikacia"
         table = "users"
+
+
+class Activity(models.Model):
+    """Модель для отслеживания активности пользователей"""
+    session_id = fields.CharField(max_length=255, pk=True)
+    email = fields.TextField(null=False)
+    activity_count = fields.IntField(default=0)
+    date_create = fields.DatetimeField(auto_now_add=True)
+    
+    class Meta:
+        schema = "s_gazifikacia"
+        table = "activity"

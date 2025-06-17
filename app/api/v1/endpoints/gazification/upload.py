@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.core.utils import create_response, log_db_operation
+from app.core.utils import create_response, log_db_operation, record_activity
 from app.schemas.base import BaseResponse
 from app.schemas.gazification import GazificationUploadRequest
 from app.models.models import AddressV2, GazificationData, TypeValue
@@ -67,13 +67,15 @@ async def upload_gazification_data(request: GazificationUploadRequest):
                     id_type_value=type_value.id,
                     value=field.value,
                     is_mobile=True,
-                    from_login=request.from_login
-                )
+                    from_login=request.from_login                )
             
             log_db_operation("create", "GazificationData", {
                 "address_id": address.id,
                 "fields_count": len(request.fields)
             })
+            
+            # Записываем активность пользователя
+            await record_activity(request.from_login or "unknown", request.session_id)
         
         return create_response(
             data=None,
