@@ -223,22 +223,10 @@ async def get_activity_data(
         query = query.filter(date_create__gte=date_from)
     if date_to:
         query = query.filter(date_create__lte=date_to)    # Получаем данные и сортируем по дате создания (по убыванию)
-    activities = await query.order_by('-date_create').all()
+    activities = await query.order_by('-date_create').values(
+        'email', 'activity_count', 'date_create'
+    )
     
-    # Преобразуем данные в нужный формат
-    result = []
-    for activity in activities:
-        # Поле date_create имеет тип time, нужно преобразовать в строку
-        date_create_str = ''
-        if activity.date_create:
-            date_create_str = str(activity.date_create)
-        
-        result.append({
-            'email': activity.email,
-            'activity_count': activity.activity_count,
-            'date_create': date_create_str
-        })
+    log_db_operation("read", "Activity", {"count": len(activities)})
     
-    log_db_operation("read", "Activity", {"count": len(result)})
-    
-    return result
+    return activities
