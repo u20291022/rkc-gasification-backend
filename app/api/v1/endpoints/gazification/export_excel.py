@@ -68,7 +68,11 @@ async def export_to_excel(
         # Создаем данные для экспорта из уникальных адресов
         data = []
         for address in unique_addresses.values():
-            gas_status = "Да" if address.get('gas_type') == 3 else "Нет"
+            gas_status = "Нет"
+            if address.get('gas_type') == 3:
+                gas_status = "Да"
+            elif address.get('gas_type') == 6:
+                gas_status = "Адрес не существует"
             date_create_formatted = None
             if address.get('date_create'):
                 date_with_offset = address['date_create'] + timedelta(hours=7)

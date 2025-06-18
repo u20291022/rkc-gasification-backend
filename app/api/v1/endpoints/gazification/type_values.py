@@ -51,15 +51,14 @@ async def get_type_values():
                     if field_value.lower() in ("true", "false"):
                         original_value = field_value.lower()
                         
-                    for related_field in related_field_models:
-                        related_fields.append(
+                    for related_field in related_field_models:                        related_fields.append(
                             ValueDependencyModel(
                                 value=original_value,
                                 related_field_id=related_field.field_id
                             )
                         )
             
-            answers = await FieldAnswer.filter(type_value_id=type_value.id).all()
+            answers = await FieldAnswer.filter(type_value_id=type_value.id).order_by('order').all()
             answers_size = []
             if answers:
                 answers_values = [answer.field_answer_value for answer in answers]
