@@ -30,7 +30,7 @@ async def get_gazification_data(
               ключ внутренний - id вопроса, значение - ответ    """# Находим адреса, которые имеют статус газификации (id_type_address = 3 или 4)
     gazification_status = {}
       # Создаем базовый фильтр для данных газификации (только мобильные)
-    gas_data_filter = Q(id_type_address__in=[3, 4]) & Q(is_mobile=True)
+    gas_data_filter = Q(id_type_address__in=[3, 4, 6]) & Q(is_mobile=True)
     
     # Добавляем фильтрацию по датам, если указаны
     if date_from:

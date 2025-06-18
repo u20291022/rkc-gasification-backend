@@ -56,15 +56,16 @@ async def update_gas_status(request: UpdateGasStatusRequest):
                     for gaz_data_curr in gazification_data:
                         gaz_data_curr.id_type_address = id_type_address
                         gaz_data_curr.from_login = request.from_login
+                        gaz_data_curr.is_mobile = True
                         # Обновляем поля id_type_address и from_login, не трогая date_create
-                        await gaz_data_curr.save(update_fields=['id_type_address', 'from_login'])
+                        await gaz_data_curr.save(update_fields=['id_type_address', 'from_login', 'is_mobile'])
                 else:
                     # Создаем новую запись о газификации
                     await GazificationData.create(
                         id_address=address.id,
                         id_type_address=id_type_address,
                         is_mobile=True,
-                        from_login=request.from_login                    )
+                        from_login=request.from_login)
                 
                 log_db_operation("update", "GazificationData", {
                     "mo_id": request.mo_id,
