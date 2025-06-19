@@ -5,18 +5,16 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     ENABLE_REQUEST_LOGGING: bool = True
     LOG_SQL_QUERIES: bool = False
-    
-    TELEGRAM_BOT_TOKEN: str = ""
-    TELEGRAM_CHAT_ID: str = ""
-    TELEGRAM_LOG_LEVEL: str = "ERROR"
-    ENABLE_TELEGRAM_LOGGING: bool = False
+    TELEGRAM_BOT_TOKEN: str
+    TELEGRAM_CHAT_ID: str
+    TELEGRAM_LOG_LEVEL: str = "INFO"
+    ENABLE_TELEGRAM_LOGGING: bool = True
 
     class Config:
         env_file = ".env"
 
 settings = Settings()
 
-# Конфигурация для Tortoise ORM (основная база данных)
 TORTOISE_ORM = {
     "connections": {"default": settings.DATABASE_URL},
     "apps": {
