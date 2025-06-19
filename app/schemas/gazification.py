@@ -70,8 +70,8 @@ class AddressCreateRequest(BaseModel):
     house: str
     flat: str | None = None
     has_gas: bool
-    from_login: str | None = None
-    session_id: str | None = None
+    from_login: str
+    session_id: str
 
 
 class UpdateGasStatusRequest(BaseModel):
@@ -82,8 +82,8 @@ class UpdateGasStatusRequest(BaseModel):
     house: str
     flat: str | None = None
     has_gas: str
-    session_id: str | None = None
-    from_login: str | None = None
+    session_id: str
+    from_login: str
 
 
 class AddressModel(BaseModel):
