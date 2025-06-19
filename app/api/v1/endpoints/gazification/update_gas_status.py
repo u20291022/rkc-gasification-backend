@@ -51,7 +51,6 @@ async def update_gas_status(request: UpdateGasStatusRequest):
                     id_type_address = 6
                 elif request.has_gas == 'not_at_home':
                     id_type_address = 7
-                print(request.has_gas, id_type_address)
 
                 # Находим запись о газификации для данного адреса или создаем новую
                 gazification_data = await GazificationData.filter(id_address=address.id).all()
