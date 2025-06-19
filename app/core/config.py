@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str
     TELEGRAM_CHAT_ID: str
     TELEGRAM_LOG_LEVEL: str = "INFO"
-    ENABLE_TELEGRAM_LOGGING: bool = True
+    ENABLE_TELEGRAM_LOGGING: bool = False
 
     class Config:
         env_file = ".env"
