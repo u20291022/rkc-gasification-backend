@@ -44,7 +44,11 @@ class TelegramLogHandler(logging.Handler):
         skip_markers = [LogCategory.DB, LogCategory.DEBUG]
         if hasattr(record, "msg") and isinstance(record.msg, str):
             if "request started:" in record.msg.lower():
-                return False
+                # Проверяем, что это POST запрос
+                if "POST" in record.msg:
+                    return False
+                else:
+                    return True
             if "request completed:" in record.msg.lower():
                 return True
                 
