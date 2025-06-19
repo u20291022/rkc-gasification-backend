@@ -41,14 +41,15 @@ async def add_address(request: AddressCreateRequest):
                 flat=flat,
                 is_mobile=True,
                 from_login=request.from_login
-            )            # Создаем запись о газификации
-            # id_type_address: 3 - подключены к газу, 4 - не подключены
+            )            # Создаем запись о газификации            # id_type_address: 3 - подключены к газу, 4 - не подключены
             id_type_address = 3 if request.has_gas else 4
             await GazificationData.create(
                 id_address=address.id,
                 id_type_address=id_type_address,
                 is_mobile=True,
-                from_login=request.from_login            )
+                from_login=request.from_login,
+                date_create=datetime.now(timezone.utc)
+            )
             
             log_db_operation("create", "AddressV2 and GazificationData", {
                 "mo_id": request.mo_id,

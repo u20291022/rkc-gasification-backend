@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from datetime import datetime, timezone
 from app.core.utils import create_response, log_db_operation, record_activity
 from app.schemas.base import BaseResponse
 from app.schemas.gazification import UpdateGasStatusRequest
@@ -52,22 +53,24 @@ async def update_gas_status(request: UpdateGasStatusRequest):
 
                 # Находим запись о газификации для данного адреса или создаем новую
                 gazification_data = await GazificationData.filter(id_address=address.id).all()
-                
                 if gazification_data:
                     # Обновляем существующую запись
                     for gaz_data_curr in gazification_data:
                         gaz_data_curr.id_type_address = id_type_address
                         gaz_data_curr.from_login = request.from_login
                         gaz_data_curr.is_mobile = True
-                        # Обновляем поля id_type_address и from_login, не трогая date_create
-                        await gaz_data_curr.save(update_fields=['id_type_address', 'from_login', 'is_mobile'])
+                        gaz_data_curr.date_create = datetime.now(timezone.utc)
+                        # Обновляем поля включая date_create
+                        await gaz_data_curr.save(update_fields=['id_type_address', 'from_login', 'is_mobile', 'date_create'])
                 else:
                     # Создаем новую запись о газификации
                     await GazificationData.create(
                         id_address=address.id,
                         id_type_address=id_type_address,
                         is_mobile=True,
-                        from_login=request.from_login)
+                        from_login=request.from_login,
+                        date_create=datetime.now(timezone.utc)
+                    )
                 
                 log_db_operation("update", "GazificationData", {
                     "mo_id": request.mo_id,

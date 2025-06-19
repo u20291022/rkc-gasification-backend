@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from datetime import datetime, timezone
 from app.core.utils import create_response, log_db_operation, record_activity
 from app.schemas.base import BaseResponse
 from app.schemas.gazification import GazificationUploadRequest
@@ -53,8 +54,7 @@ async def upload_gazification_data(request: GazificationUploadRequest):
                 log_db_operation("create", "AddressV2", {
                     "address_id": address.id,
                     "mo_id": request.address.mo_id,
-                    "district": request.address.district,
-                    "street": request.address.street,
+                    "district": request.address.district,                    "street": request.address.street,
                     "house": request.address.house,
                     "flat": request.address.flat
                 })
@@ -67,7 +67,9 @@ async def upload_gazification_data(request: GazificationUploadRequest):
                     id_type_value=type_value.id,
                     value=field.value,
                     is_mobile=True,
-                    from_login=request.from_login                )
+                    from_login=request.from_login,
+                    date_create=datetime.now(timezone.utc)
+                )
             
             log_db_operation("create", "GazificationData", {
                 "address_id": address.id,
