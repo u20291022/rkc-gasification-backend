@@ -40,11 +40,13 @@ class TelegramLogHandler(logging.Handler):
     def _should_skip_log(self, record: logging.LogRecord) -> bool:
         if record.levelno >= logging.ERROR:
             return False
-            
+        
         skip_markers = [LogCategory.DB, LogCategory.DEBUG]
         if hasattr(record, "msg") and isinstance(record.msg, str):
             if "request started:" in record.msg.lower():
                 return False
+            if "request completed:" in record.msg.lower():
+                return True
                 
             for category in LogCategory:
                 marker = f"[{category.value}]"
