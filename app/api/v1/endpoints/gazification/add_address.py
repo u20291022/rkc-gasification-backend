@@ -30,7 +30,7 @@ async def add_address(request: AddressCreateRequest):
             house = house if house else None
             
             flat = request.flat.strip() if request.flat else None
-            flat = flat if flat else None
+            flat = flat.upper() if flat else None
               # Создаем новую запись в таблице адресов
             address = await AddressV2.create(
                 id_mo=request.mo_id,
