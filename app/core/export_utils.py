@@ -4,6 +4,9 @@ from typing import Optional, List, Dict, Any, Tuple
 from datetime import date
 from app.models.models import AddressV2, TypeValue, FieldType, GazificationData, Municipality
 from app.core.utils import log_db_operation
+from app.core.cache import get_municipalities_cached, get_field_types_cached, get_questions_cached
+from app.core.export_optimization import process_addresses_parallel
+from app.core.export_config import get_parallel_threshold
 
 async def get_gazification_data(
     mo_id: Optional[int] = None, 
@@ -13,7 +16,7 @@ async def get_gazification_data(
     date_to: Optional[date] = None
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
     """
-    Получает данные о газификации на основе фильтров
+    Получает данные о газификации на основе фильтров (оптимизированная версия)
     
     Args:
         mo_id: ID муниципалитета (опционально)
@@ -27,9 +30,13 @@ async def get_gazification_data(
             - addresses: список адресов, соответствующих фильтрам
             - questions: список вопросов (TypeValue) для отображения в отчете
             - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса, 
-              ключ внутренний - id вопроса, значение - ответ    """# Находим адреса, которые имеют статус газификации (id_type_address = 3 или 4)
-    gazification_status = {}
-      # Создаем базовый фильтр для данных газификации (только мобильные)
+              ключ внутренний - id вопроса, значение - ответ
+    """
+    # ОПТИМИЗАЦИЯ 1: Используем SQL подзапрос для получения самой свежей записи по каждому адресу
+    from tortoise.queryset import QuerySet
+    from tortoise import connections
+    
+    # Создаем базовый фильтр для данных газификации (только мобильные)
     gas_data_filter = Q(id_type_address__in=[3, 4, 6, 7]) & Q(is_mobile=True)
     
     # Добавляем фильтрацию по датам, если указаны
@@ -37,31 +44,45 @@ async def get_gazification_data(
         gas_data_filter = gas_data_filter & Q(date_create__gte=date_from)
     if date_to:
         gas_data_filter = gas_data_filter & Q(date_create__lte=date_to)
-      # Получаем данные о статусе газификации для адресов
-    gas_status_data = await GazificationData.filter(gas_data_filter).values(
+    
+    # ОПТИМИЗАЦИЯ 2: Получаем только самые свежие записи газификации через SQL
+    # Используем window function для получения последней записи по каждому адресу
+    gas_status_query = GazificationData.filter(gas_data_filter).annotate(
+        row_number=F("row_number() OVER (PARTITION BY id_address ORDER BY date_create DESC)")
+    ).filter(row_number=1).values(
         'id_address', 'id_type_address', 'date_create', 'from_login'
     )
-      # Создаем словарь {id_address: {'gas_type': id_type_address, 'date_create': date, 'from_login': from_login}}
-    address_gas_info = {}
-    for item in gas_status_data:
-        address_id = item['id_address']
-        type_address = item['id_type_address']
-        date_create = item['date_create']
-        from_login = item['from_login']
-        
-        # Если для адреса уже есть запись, берем самую новую
-        if address_id not in address_gas_info or date_create > address_gas_info[address_id]['date_create']:
-            address_gas_info[address_id] = {
-                'gas_type': type_address,
-                'date_create': date_create,
-                'from_login': from_login
-            }
-    gazification_status = {addr_id: info['gas_type'] for addr_id, info in address_gas_info.items()}
     
-    # Получаем список адресов с информацией о газификации
-    addresses_with_gas_info = list(gazification_status.keys())
-      # Базовый фильтр для адресов (только мобильные)
-    # Если есть адреса с газификацией, используем их, иначе берем все мобильные адреса с домами
+    # Fallback на Python если window functions не поддерживаются
+    try:
+        gas_status_data = await gas_status_query
+    except:
+        # Используем старый метод с сортировкой в Python
+        gas_status_data_all = await GazificationData.filter(gas_data_filter).order_by(
+            'id_address', '-date_create'
+        ).values('id_address', 'id_type_address', 'date_create', 'from_login')
+        
+        # Берем только первую (самую свежую) запись для каждого адреса
+        seen_addresses = set()
+        gas_status_data = []
+        for item in gas_status_data_all:
+            if item['id_address'] not in seen_addresses:
+                gas_status_data.append(item)
+                seen_addresses.add(item['id_address'])
+    
+    # ОПТИМИЗАЦИЯ 3: Создаем словари одним проходом
+    address_gas_info = {
+        item['id_address']: {
+            'gas_type': item['id_type_address'],
+            'date_create': item['date_create'],
+            'from_login': item['from_login']
+        }
+        for item in gas_status_data
+    }
+    
+    gazification_status = {addr_id: info['gas_type'] for addr_id, info in address_gas_info.items()}
+    addresses_with_gas_info = list(address_gas_info.keys())    # ОПТИМИЗАЦИЯ 4: Объединяем фильтры и используем один запрос для получения адресов
+    # Базовый фильтр для адресов (только мобильные)
     if addresses_with_gas_info:
         base_filter = Q(house__isnull=False) & Q(id__in=addresses_with_gas_info)
     else:
@@ -71,28 +92,25 @@ async def get_gazification_data(
     if mo_id is not None:
         base_filter = base_filter & Q(id_mo=mo_id)
     
-    # Строим запрос для получения адресов
-    query = AddressV2.filter(base_filter)
-      # Если указан район, добавляем фильтр
+    # Если указан район, добавляем фильтр
     if district:
         normalized_district = district.strip().lower()
-        query = query.annotate(
-            district_lower=Lower("district"),
-            city_lower=Lower("city")
-        ).filter(
-            (Q(district_lower=normalized_district)) | 
-            (Q(district__isnull=True) & Q(city_lower=normalized_district))
+        base_filter = base_filter & (
+            (Q(district__icontains=normalized_district)) | 
+            (Q(district__isnull=True) & Q(city__icontains=normalized_district))
         )
     
     # Если указана улица, добавляем фильтр
     if street:
         normalized_street = street.strip().lower()
-        query = query.annotate(
-            street_lower=Lower("street")
-        ).filter(street_lower=normalized_street)    # Получаем все подходящие адреса
-    addresses = await query.values(
+        base_filter = base_filter & Q(street__icontains=normalized_street)
+      # ОПТИМИЗАЦИЯ 5: Получаем адреса и кешированные названия муниципалитетов
+    addresses = await AddressV2.filter(base_filter).values(
         'id', 'id_mo', 'district', 'city', 'street', 'house', 'flat', 'from_login'
     )
+    
+    # Получаем кешированные названия муниципалитетов
+    mo_names = await get_municipalities_cached()
     
     log_db_operation("read", "AddressV2", {
         "mo_id": mo_id, 
@@ -101,100 +119,94 @@ async def get_gazification_data(
         "date_from": date_from.isoformat() if date_from else None,
         "date_to": date_to.isoformat() if date_to else None,
         "count": len(addresses)
-    })    # Добавляем информацию о статусе газификации к адресам и фильтруем на Python
-    filtered_addresses = []
-    for address in addresses:
-        # Фильтруем пустые строки и строки с пробелами на Python
-        district = address.get('district', '').strip() if address.get('district') else ''
-        city = address.get('city', '').strip() if address.get('city') else ''
-        street = address.get('street', '').strip() if address.get('street') else ''
-        house = address.get('house', '').strip() if address.get('house') else ''
-        flat = address.get('flat', '').strip() if address.get('flat') else ''
+    })    # ОПТИМИЗАЦИЯ 6: Фильтруем и обогащаем адреса параллельно для больших объемов
+    parallel_threshold = get_parallel_threshold()
+    if len(addresses) > parallel_threshold:
+        # Для больших объемов используем параллельную обработку
+        addresses = await process_addresses_parallel(addresses, address_gas_info, mo_names)
+    else:
+        # Для маленьких объемов используем обычную обработку
+        filtered_addresses = []
+        for address in addresses:
+            # Быстрая проверка и очистка данных
+            district = (address.get('district') or '').strip() or None
+            city = (address.get('city') or '').strip() or None
+            street_val = (address.get('street') or '').strip() or None
+            house = (address.get('house') or '').strip()
+            flat = (address.get('flat') or '').strip() or None
+            
+            # Пропускаем записи где нет ни района, ни города, или нет дома
+            if (not district and not city) or not house:
+                continue
+            
+            # Специальная обработка для "Нет улиц"
+            if street_val == 'Нет улиц':
+                street_val = None
+            
+            # Создаем обогащенный адрес
+            address_id = address['id']
+            mo_id_val = address['id_mo']
+            enriched_address = {
+                'id': address_id,
+                'id_mo': mo_id_val,
+                'district': district,
+                'city': city,
+                'street': street_val,
+                'house': house,
+                'flat': flat,
+                'from_login': address['from_login'],
+                'mo_name': mo_names.get(mo_id_val, 'Неизвестный муниципалитет') if mo_id_val else 'Неизвестный муниципалитет'
+            }
+            
+            # Добавляем информацию о газификации
+            if address_id in address_gas_info:
+                gas_info = address_gas_info[address_id]
+                enriched_address.update({
+                    'gas_type': gas_info['gas_type'],
+                    'date_create': gas_info['date_create'],
+                    'gas_from_login': gas_info['from_login']
+                })
+            
+            filtered_addresses.append(enriched_address)
         
-        # Пропускаем записи где нет ни района, ни города, или нет дома
-        if (not district and not city) or not house:
-            continue
-        
-        # Обновляем данные в адресе
-        address['district'] = district if district else None
-        address['city'] = city if city else None
-        address['street'] = street if street else None
-        address['house'] = house if house else None
-        address['flat'] = flat if flat else None
-        if address['street'] == 'Нет улиц':
-            address['street'] = ''
-
-        address_id = address['id']
-        if address_id in gazification_status:
-            address['gas_type'] = gazification_status[address_id]
-        if address_id in address_gas_info:
-            address['date_create'] = address_gas_info[address_id]['date_create']
-            address['gas_from_login'] = address_gas_info[address_id]['from_login']
-        
-        filtered_addresses.append(address)
+        addresses = filtered_addresses
     
-    addresses = filtered_addresses
-    
-    # Получаем названия муниципалитетов для всех адресов
-    mo_ids = {address['id_mo'] for address in addresses if address['id_mo'] is not None}
-    municipalities = await Municipality.filter(id__in=mo_ids).values('id', 'name')
-    mo_names = {mo['id']: mo['name'] for mo in municipalities}
-      # Получаем вопросы для мобильного приложения и не типа "info"
-    field_types = await FieldType.all()
-    field_type_mapping = {ft.field_type_id: ft.field_type_name for ft in field_types}
-    
-    info_field_type_ids = [field_id for field_id, name in field_type_mapping.items() 
-                           if name == "info"]
-    
-    questions = await TypeValue.filter(
-        for_mobile=True
-    ).exclude(
-        field_type_id__in=info_field_type_ids
-    ).order_by('order').values(
-        'id', 'type_value', 'description', 'field_type_id'
-    )
-    
-    # Добавляем названия типов полей
-    for question in questions:
-        field_type_id = question.get('field_type_id')
-        if field_type_id:
-            question['field_type'] = field_type_mapping.get(field_type_id)
+    # ОПТИМИЗАЦИЯ 7: Получаем вопросы из кеша
+    questions = await get_questions_cached()
     
     log_db_operation("read", "TypeValue", {"count": len(questions)})
-      # Обогащаем адреса названиями муниципалитетов
-    for address in addresses:
-        mo_id = address.get('id_mo')
-        if mo_id and mo_id in mo_names:
-            address['mo_name'] = mo_names[mo_id]
-        else:
-            address['mo_name'] = "Неизвестный муниципалитет"
-      # Получаем ответы на вопросы для найденных адресов (только мобильные)
-    address_ids = [address['id'] for address in addresses]
-    answers_data = await GazificationData.filter(
-        id_address__in=address_ids,
-        id_type_value__isnull=False,
-        is_mobile=True
-    ).values('id_address', 'id_type_value', 'value')
     
-    # Форматируем ответы в виде словаря {id_address: {id_type_value: value}}
-    answers = {}
-    for answer in answers_data:
-        address_id = answer['id_address']
-        type_value_id = answer['id_type_value']
-        value = answer['value']
+    # ОПТИМИЗАЦИЯ 8: Получаем ответы оптимизированно
+    if addresses:
+        address_ids = [address['id'] for address in addresses]
+        answers_data = await GazificationData.filter(
+            id_address__in=address_ids,
+            id_type_value__isnull=False,
+            is_mobile=True
+        ).values('id_address', 'id_type_value', 'value')
         
-        # Преобразуем true/false в Да/Нет
-        if value and value.lower() == 'true':
-            value = 'Да'
-        elif value and value.lower() == 'false':
-            value = 'Нет'
-        
-        if address_id not in answers:
-            answers[address_id] = {}
+        # ОПТИМИЗАЦИЯ 9: Создаем словарь ответов оптимизированно
+        answers = {}
+        for answer in answers_data:
+            address_id = answer['id_address']
+            type_value_id = answer['id_type_value']
+            value = answer['value']
             
-        answers[address_id][type_value_id] = value
-    
-    log_db_operation("read", "GazificationData", {"count": len(answers_data)})
+            # Быстрая обработка булевых значений
+            if value:
+                if value.lower() == 'true':
+                    value = 'Да'
+                elif value.lower() == 'false':
+                    value = 'Нет'
+            
+            if address_id not in answers:
+                answers[address_id] = {}
+                
+            answers[address_id][type_value_id] = value
+        
+        log_db_operation("read", "GazificationData", {"count": len(answers_data)})
+    else:
+        answers = {}
     
     return addresses, questions, answers
 

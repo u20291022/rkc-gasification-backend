@@ -4,6 +4,8 @@ from app.core.utils import create_response, log_db_operation
 from app.schemas.base import BaseResponse
 from app.core.exceptions import DatabaseError
 from app.core.export_utils import get_gazification_data
+from app.core.export_optimization import create_excel_data_vectorized, create_optimized_dataframe
+from app.core.export_config import get_vectorized_threshold, get_optimization_config
 from typing import Optional
 from datetime import date
 import pandas as pd
@@ -11,6 +13,10 @@ import tempfile
 import os
 from datetime import datetime
 from datetime import timedelta
+import logging
+
+logger = logging.getLogger(__name__)
+config = get_optimization_config()
 
 router = APIRouter()
 
@@ -29,6 +35,8 @@ async def export_to_excel(
     Если параметры не указаны, выгружаются все данные.
     """
     try:
+        logger.info(f"Starting export with filters: mo_id={mo_id}, district={district}, street={street}, date_from={date_from}, date_to={date_to}")
+        
         addresses, questions, answers = await get_gazification_data(
             mo_id, district, street, date_from, date_to
         )
@@ -39,137 +47,133 @@ async def export_to_excel(
                 detail="Не найдено данных для экспорта с указанными параметрами"
             )
         
-        # Создаем DataFrame для экспорта
-        # Сначала создаем словарь для отслеживания уникальных адресов
-        unique_addresses = {}
+        logger.info(f"Retrieved {len(addresses)} addresses, {len(questions)} questions")
         
-        for address in addresses:
-            # Создаем ключ для идентификации уникального адреса
-            address_key = (
-                address.get('id_mo'),
-                (address.get('district') or '').strip().lower(),
-                (address.get('city') or '').strip().lower(), 
-                (address.get('street') or '').strip().lower(),
-                (address.get('house') or '').strip().lower(),
-                (address.get('flat') or '').strip().lower()
+        # ОПТИМИЗАЦИЯ: Используем векторизованное создание данных для больших объемов
+        vectorized_threshold = get_vectorized_threshold()
+        if len(addresses) > vectorized_threshold:
+            logger.info("Using vectorized data creation for large dataset")
+            data = create_excel_data_vectorized(addresses, questions, answers)
+        else:
+            # Для небольших объемов используем стандартный подход
+            data = []
+            gas_status_map = {3: "Да", 6: "Адрес не существует", 4: "Нет", 7: "Нет"}
+            question_columns = [(q['id'], q.get('type_value', f"Вопрос {q['id']}")) for q in questions]
+            
+            for address in addresses:
+                # Быстрое определение статуса газификации
+                gas_status = gas_status_map.get(address.get('gas_type'), "Нет")
+                
+                # Оптимизированное форматирование даты
+                date_create_formatted = None
+                date_create = address.get('date_create')
+                if date_create:
+                    try:
+                        date_with_offset = date_create + timedelta(hours=7)
+                        date_create_formatted = date_with_offset.strftime("%d.%m.%Y %H:%M")
+                    except:
+                        date_create_formatted = str(date_create)
+                
+                # Определяем район/город
+                district_city = address.get('district') or address.get('city') or 'Не указан'
+                
+                # Создаем базовую строку данных оптимизированно
+                row = {
+                    'Дата создания': date_create_formatted,
+                    'Создатель адреса': address.get('from_login') or 'Отсутствует',
+                    'Отправитель': address.get('gas_from_login') or 'Отсутствует',
+                    'Муниципалитет': address.get('mo_name', 'Не указан'),
+                    'Район': district_city,
+                    'Улица': address.get('street') or 'Не указана',
+                    'Дом': address.get('house', 'Не указан'),
+                    'Квартира': address.get('flat', ''),
+                    'Газифицирован?': gas_status,
+                }
+                
+                # Быстрое добавление ответов на вопросы
+                address_id = address['id']
+                address_answers = answers.get(address_id, {})
+                
+                # Используем dict comprehension для быстрого добавления ответов
+                row.update({
+                    column_name: address_answers.get(question_id, '')
+                    for question_id, column_name in question_columns
+                })
+                    
+                data.append(row)
+        
+        # Проверяем, что данные есть
+        if not data:
+            raise HTTPException(
+                status_code=404, 
+                detail="Нет данных для экспорта после фильтрации"
             )
-            
-            # Если адрес уже есть, сравниваем даты и оставляем более свежий
-            if address_key in unique_addresses:
-                existing_date = unique_addresses[address_key].get('date_create')
-                current_date = address.get('date_create')
-                
-                # Если у текущего адреса дата новее (или у существующего нет даты)
-                if current_date and (not existing_date or current_date > existing_date):
-                    unique_addresses[address_key] = address
-            else:
-                unique_addresses[address_key] = address
         
-        # Создаем данные для экспорта из уникальных адресов
-        data = []
-        for address in unique_addresses.values():
-            gas_status = "Нет"
-            if address.get('gas_type') == 3:
-                gas_status = "Да"
-            elif address.get('gas_type') == 6:
-                gas_status = "Адрес не существует"
-            date_create_formatted = None
-            if address.get('date_create'):
-                date_with_offset = address['date_create'] + timedelta(hours=7)
-                date_create_formatted = date_with_offset.strftime("%d.%m.%Y %H:%M")
-            
-            row = {
-                'Дата создания': date_create_formatted,
-                'Создатель адреса': address.get('from_login') or 'Отсутствует',
-                'Отправитель': address.get('gas_from_login') or 'Отсутствует',
-                'Муниципалитет': address.get('mo_name', 'Не указан'),
-                'Район': address.get('district') or address.get('city') or 'Не указан',
-                'Улица': address.get('street', 'Не указана'),
-                'Дом': address.get('house', 'Не указан'),
-                'Квартира': address.get('flat', ''),
-                'Газифицирован?': gas_status,
-            }
-            
-            # Добавляем столбцы для всех вопросов и их ответы
-            for question in questions:
-                question_id = question.get('id')
-                column_name = question.get('type_value', f"Вопрос {question_id}")
-                
-                # Ищем ответ на вопрос для текущего адреса
-                address_id = address.get('id')
-                answer_value = ''
-                
-                if address_id in answers and question_id in answers[address_id]:
-                    answer_value = answers[address_id][question_id]
-                
-                row[column_name] = answer_value
-                
-            data.append(row)
+        # Создаем DataFrame оптимизированно для больших объемов
+        if len(data) > vectorized_threshold:
+            df = await create_optimized_dataframe(data)
+        else:
+            df = pd.DataFrame(data)
         
-        # Создаем DataFrame и сохраняем в Excel
-        df = pd.DataFrame(data)
-        
-        # Создаем временный файл
+        # Создаем Excel файл с оптимизированными настройками
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         temp_dir = tempfile.gettempdir()
         file_path = os.path.join(temp_dir, f"gazification_export_{timestamp}.xlsx")
         
-        # Настройка стилей для Excel
-        with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
+        # Используем настройки из конфигурации
+        excel_options = config["excel_options"]
+        formatting_config = config["excel_formatting"]
+        column_config = config["excel_columns"]
+        
+        with pd.ExcelWriter(file_path, **excel_options) as writer:
             df.to_excel(writer, sheet_name='Газификация', index=False)
             
-            # Форматирование
             workbook = writer.book
             worksheet = writer.sheets['Газификация']
-              # Форматы для заголовков и ячеек
-            header_format = workbook.add_format({
-                'bold': True,
-                'text_wrap': True,
-                'valign': 'top',
-                'align': 'center',
-                'border': 1,
-                'bg_color': '#D7E4BC'
-            })
             
-            cell_format = workbook.add_format({
-                'border': 1,
-                'text_wrap': True
-            })
-              # Формат для столбца с датами
-            date_format = workbook.add_format({
-                'border': 1,
-                'num_format': 'dd.mm.yyyy hh:mm'
-            })
+            # Создаем форматы из конфигурации
+            header_format = workbook.add_format(formatting_config["header_format"])
+            cell_format = workbook.add_format(formatting_config["cell_format"])
+            date_format = workbook.add_format(formatting_config["date_format"])
             
-            # Применяем форматирование к заголовкам
-            for col_num, value in enumerate(df.columns.values):
-                worksheet.write(0, col_num, value, header_format)
-                worksheet.set_column(col_num, col_num, max(len(str(value)) + 2, 15))
+            # Применяем форматирование к заголовкам и настраиваем ширину колонок
+            for col_num, column_name in enumerate(df.columns):
+                worksheet.write(0, col_num, column_name, header_format)
+                
+                # Устанавливаем ширину колонки из конфигурации
+                column_width = column_config.get(column_name, column_config["default_width"])
+                worksheet.set_column(col_num, col_num, column_width)
             
-            # Применяем форматирование к ячейкам
-            for row_num in range(1, len(df) + 1):
+            # Оптимизированное форматирование данных
+            num_rows = len(df)
+            if num_rows > 0:
+                # Находим колонку с датами
+                date_col = None
+                for col_num, column_name in enumerate(df.columns):
+                    if column_name == 'Дата создания':
+                        date_col = col_num
+                        break
+                
+                # Форматируем все данные кроме дат
                 for col_num in range(len(df.columns)):
-                    column_name = df.columns[col_num]
-                    cell_value = df.iloc[row_num-1, col_num]
-                      # Для столбца "Дата создания" применяем формат даты
-                    if column_name == 'Дата создания' and cell_value:
-                        # Преобразуем строку даты обратно в datetime для Excel
-                        try:
-                            if isinstance(cell_value, str) and cell_value:
+                    if col_num != date_col:
+                        for row_num in range(1, num_rows + 1):
+                            worksheet.write(row_num, col_num, df.iloc[row_num-1, col_num], cell_format)
+                
+                # Специальное форматирование для дат
+                if date_col is not None:
+                    for row_num in range(1, num_rows + 1):
+                        cell_value = df.iloc[row_num-1, date_col]
+                        if cell_value and isinstance(cell_value, str):
+                            try:
                                 date_obj = datetime.strptime(cell_value, "%d.%m.%Y %H:%M")
-                                worksheet.write(row_num, col_num, date_obj, date_format)
-                            else:
-                                worksheet.write(row_num, col_num, cell_value, cell_format)
-                        except:
-                            worksheet.write(row_num, col_num, cell_value, cell_format)
-                    else:
-                        worksheet.write(row_num, col_num, cell_value, cell_format)
+                                worksheet.write(row_num, date_col, date_obj, date_format)
+                            except:
+                                worksheet.write(row_num, date_col, cell_value, cell_format)
+                        else:
+                            worksheet.write(row_num, date_col, cell_value, cell_format)
             
-            # Автоподбор ширины столбцов
-            for col_num, column in enumerate(df.columns):
-                column_width = max(df[column].astype(str).map(len).max(), len(column) + 2)
-                worksheet.set_column(col_num, col_num, min(column_width, 50))  # Ограничиваем максимальную ширину
-            
+            # Логирование результата
             log_db_operation("export", "Excel", {
                 "mo_id": mo_id, 
                 "district": district, 
@@ -178,15 +182,19 @@ async def export_to_excel(
                 "date_to": date_to.isoformat() if date_to else None,
                 "rows": len(data),
                 "questions": len(questions),
-                "file": file_path
+                "file": file_path,
+                "unique_addresses": len(addresses),
+                "optimization_used": "vectorized" if len(addresses) > vectorized_threshold else "standard"
             })
         
-        # Возвращаем файл
+        # Возвращаем файл с оптимизированными заголовками
         return FileResponse(
             path=file_path,
             filename=f"gazification_export_{timestamp}.xlsx",
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Cache-Control": "no-cache"}
         )
         
     except Exception as e:
+        logger.error(f"Error during Excel export: {str(e)}")
         raise DatabaseError(f"Ошибка при экспорте данных в Excel: {str(e)}")
