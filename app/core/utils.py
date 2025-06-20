@@ -7,7 +7,7 @@ from typing import Optional, Any
 
 logger = get_logger("utils")
 
-def create_response(data, message="Успех", ok=True):
+def create_response(data, message="Успех (тест)", ok=True):
     logger.debug(categorize_log(f"Creating response: {message}", LogCategory.DEBUG), 
                 extra={"ok": ok, "has_data": data is not None})
     return BaseResponse(ok=ok, message=message, data=data)
