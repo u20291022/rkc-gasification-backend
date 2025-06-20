@@ -16,8 +16,7 @@ jobs:
                   host: ${{ secrets.SSH_HOST }}
                   username: ${{ secrets.SSH_USERNAME }}
                   password: ${{ secrets.SSH_PASSWORD }}
-                  script: |
-                      # Переход в директорию проекта
+                  script: |                      # Переход в директорию dev проекта
                       cd /opt/rkc-gazik-quiz-test
 
                       # Сохранение текущего коммита для возможного отката
