@@ -39,9 +39,7 @@ jobs:
                       pip install -r requirements.txt
 
                       # Проверка кода на ошибки (например, синтаксис)
-                      python3 -m py_compile main.py
-
-                      # Остановка dev сервиса
+                      python3 -m py_compile main.py                      # Остановка dev сервиса (без пароля, если настроен sudoers)
                       sudo systemctl stop rkc_gazification_test_server.service || true
 
                       # Запуск dev сервиса
