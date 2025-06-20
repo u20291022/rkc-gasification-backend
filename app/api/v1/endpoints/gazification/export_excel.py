@@ -114,18 +114,26 @@ async def export_to_excel(
             df = await create_optimized_dataframe(data)
         else:
             df = pd.DataFrame(data)
-        
-        # Создаем Excel файл с оптимизированными настройками
+          # Создаем Excel файл с оптимизированными настройками
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         temp_dir = tempfile.gettempdir()
         file_path = os.path.join(temp_dir, f"gazification_export_{timestamp}.xlsx")
         
         # Используем настройки из конфигурации
-        excel_options = config["excel_options"]
         formatting_config = config["excel_formatting"]
         column_config = config["excel_columns"]
         
-        with pd.ExcelWriter(file_path, **excel_options) as writer:
+        # Исправляем параметры для ExcelWriter
+        excel_writer_options = {
+            'engine': 'xlsxwriter',
+            'options': {
+                'strings_to_numbers': True,
+                'strings_to_formulas': False,
+                'strings_to_urls': False
+            }
+        }
+        
+        with pd.ExcelWriter(file_path, engine='xlsxwriter', options=excel_writer_options['options']) as writer:
             df.to_excel(writer, sheet_name='Газификация', index=False)
             
             workbook = writer.book

@@ -19,16 +19,15 @@ EXPORT_OPTIMIZATION_CONFIG: Dict[str, Any] = {
     
     # Максимальное количество потоков для ThreadPoolExecutor
     "max_workers": 4,
-    
-    # Настройки для pandas и Excel
+      # Настройки для pandas и Excel
     "pandas_options": {
         "chunksize": 10000,
         "low_memory": True,
     },
     
-    "excel_options": {
+    "excel_writer_options": {
         "engine": "xlsxwriter",
-        "options": {
+        "writer_options": {
             "strings_to_numbers": True,
             "strings_to_formulas": False,
             "strings_to_urls": False,
