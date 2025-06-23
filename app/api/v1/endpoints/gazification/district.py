@@ -15,7 +15,7 @@ async def get_districts(mo_id: int = Path()):
     try:
         # Находим адреса, которые газифицированы (id_type_address = 3)
         gazified_addresses = await GazificationData.filter(
-            id_type_address=3
+            Q(id_type_address=3) | Q(id_type_address=6)
         ).values_list('id_address', flat=True)        # Получаем районы из поля district
         district_addresses = await AddressV2.filter(
             Q(id_mo=mo_id) &
