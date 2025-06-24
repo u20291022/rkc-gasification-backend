@@ -1,0 +1,72 @@
+name: Deploy To Dev Server
+
+on:
+    push:
+        branches:
+            - dev
+    workflow_dispatch:
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Deploy to dev server
+              uses: appleboy/ssh-action@v0.1.7
+              with:
+                  host: ${{ secrets.SSH_HOST }}
+                  username: ${{ secrets.SSH_USERNAME }}
+                  password: ${{ secrets.SSH_PASSWORD }}
+                  script: |                      # Переход в директорию dev проекта
+                      cd /opt/rkc-gazik-quiz-test
+
+                      # Сохранение текущего коммита для возможного отката
+                      CURRENT_COMMIT=$(git rev-parse HEAD)
+                      echo "Current commit: $CURRENT_COMMIT"
+
+                      # Обновление кода через git (используем dev ветку)
+                      git pull https://${{ secrets.GIT_TOKEN }}@github.com/${{ github.repository }}.git dev                      # Создание venv если его нет (принудительно в текущей директории)
+                      if [ ! -d ".venv" ]; then
+                        rm -rf .venv  # удаляем если есть битый симлинк
+                        python3 -m venv .venv
+                      fi
+
+                      # Активация виртуального окружения (принудительно из текущей директории)
+                      source ./.venv/bin/activate
+
+                      # Установка/обновление зависимостей
+                      pip install -r requirements.txt                      # Проверка кода на ошибки (например, синтаксис)
+                      python3 -m py_compile main.py
+                      
+                      # Остановка dev сервиса
+                      echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl stop rkc_gazification_test_server.service || true
+
+                      # Запуск dev сервиса
+                      echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl start rkc_gazification_test_server.service
+
+                      # Проверка статуса сервиса
+                      sleep 5
+                      if echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl is-active --quiet rkc_gazification_test_server.service; then
+                        echo "Dev service started successfully"
+                        echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl enable rkc_gazification_test_server.service
+                      else
+                        echo "Dev service failed to start, rolling back..."
+                        # Откат к предыдущему коммиту
+                        git reset --hard $CURRENT_COMMIT
+                          # Переустановка зависимостей на случай если они изменились
+                        source ./.venv/bin/activate
+                        pip install -r requirements.txt
+                          # Повторный запуск с предыдущей версией
+                        echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl start rkc_gazification_test_server.service
+                        
+                        # Проверка что откат сработал
+                        if echo "${{ secrets.SSH_PASSWORD }}" | sudo -S systemctl is-active --quiet rkc_gazification_test_server.service; then
+                          echo "Rollback successful, dev service is running with previous version"
+                        else
+                          echo "Critical error: dev service failed to start even after rollback"
+                          exit 1
+                        fi
+                        exit 1
+                      fi
+
+                      # Финальная проверка логов
+                      echo "${{ secrets.SSH_PASSWORD }}" | sudo -S journalctl -u rkc_gazification_test_server.service --no-pager -n 10

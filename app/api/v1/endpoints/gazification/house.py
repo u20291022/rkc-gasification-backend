@@ -14,7 +14,7 @@ async def get_houses(mo_id: int = Path(), district: str = Path(), street: str = 
     try:
         # Находим адреса, которые газифицированы (id_type_address = 3)
         gazified_addresses = await GazificationData.filter(
-            id_type_address=3
+            Q(id_type_address=3) | Q(id_type_address=6)
         ).values_list('id_address', flat=True)
         
         # Создаем условие для проверки улицы

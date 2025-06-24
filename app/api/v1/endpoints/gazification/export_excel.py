@@ -5,12 +5,10 @@ from app.schemas.base import BaseResponse
 from app.core.exceptions import DatabaseError
 from app.core.export_utils import get_gazification_data
 from typing import Optional
-from datetime import date
+from datetime import datetime, timedelta
 import pandas as pd
 import tempfile
 import os
-from datetime import datetime
-from datetime import timedelta
 
 router = APIRouter()
 
@@ -19,8 +17,8 @@ async def export_to_excel(
     mo_id: Optional[int] = Query(None, description="ID муниципалитета"),
     district: Optional[str] = Query(None, description="Название района"),
     street: Optional[str] = Query(None, description="Название улицы"),
-    date_from: Optional[date] = Query(None, description="Начальная дата для фильтрации (YYYY-MM-DD)"),
-    date_to: Optional[date] = Query(None, description="Конечная дата для фильтрации (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(None, description="Начальная дата для фильтрации (YYYY-MM-DD или YYYY-MM-DDTHH:MM:SS)"),
+    date_to: Optional[str] = Query(None, description="Конечная дата для фильтрации (YYYY-MM-DD или YYYY-MM-DDTHH:MM:SS)"),
 ):
     """
     Экспорт данных в Excel файл
@@ -29,8 +27,32 @@ async def export_to_excel(
     Если параметры не указаны, выгружаются все данные.
     """
     try:
+        # Парсим даты с поддержкой времени
+        def parse_date(date_str, is_start=True):
+            if not date_str:
+                return None
+            try:
+                # Если указано только YYYY-MM-DD
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                return dt if is_start else dt + timedelta(days=1) - timedelta(microseconds=1)
+            except ValueError:
+                pass
+            try:
+                # Если указано с временем
+                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                pass
+            try:
+                # Если указано с временем и миллисекундами
+                return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f")
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Неверный формат даты: {date_str}")
+
+        dt_from = parse_date(date_from, is_start=True)
+        dt_to = parse_date(date_to, is_start=False)
+
         addresses, questions, answers = await get_gazification_data(
-            mo_id, district, street, date_from, date_to
+            mo_id, district, street, dt_from, dt_to
         )
         
         if not addresses:
@@ -174,8 +196,8 @@ async def export_to_excel(
                 "mo_id": mo_id, 
                 "district": district, 
                 "street": street,
-                "date_from": date_from.isoformat() if date_from else None,
-                "date_to": date_to.isoformat() if date_to else None,
+                "date_from": dt_from.isoformat() if dt_from else None,
+                "date_to": dt_to.isoformat() if dt_to else None,
                 "rows": len(data),
                 "questions": len(questions),
                 "file": file_path

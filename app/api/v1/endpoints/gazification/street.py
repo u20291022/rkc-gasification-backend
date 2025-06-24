@@ -17,7 +17,7 @@ async def get_streets(mo_id: int = Path(), district: str = Path()):
         
         # Находим адреса, которые газифицированы (id_type_address = 3)
         gazified_addresses = await GazificationData.filter(
-            id_type_address=3
+            Q(id_type_address=3) | Q(id_type_address=6)
         ).values_list('id_address', flat=True)
           # Получаем улицы для записей с district, соответствующим переданному значению
         district_streets = await AddressV2.filter(
