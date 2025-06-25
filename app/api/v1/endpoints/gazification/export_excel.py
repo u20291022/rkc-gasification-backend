@@ -95,6 +95,8 @@ async def export_to_excel(
                 gas_status = "Да"
             elif address.get('gas_type') == 6:
                 gas_status = "Адрес не существует"
+            elif address.get('gas_type') == 7:
+                gas_status = "Собственника нет дома"
             date_create_formatted = None
             if address.get('date_create'):
                 date_with_offset = address['date_create'] + timedelta(hours=7)
