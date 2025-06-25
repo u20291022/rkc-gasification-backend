@@ -11,5 +11,5 @@ from app.schemas.gazification import (
     AddressCreateRequest,
     AddressModel,
     FieldModel,
-    GazificationUploadRequest
+    GazificationUploadRequest,
 )
