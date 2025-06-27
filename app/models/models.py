@@ -2,9 +2,9 @@ from tortoise import fields, models
 from tortoise.contrib.postgres.fields import ArrayField
 
 
-# Модели для Газификации
 class Municipality(models.Model):
     """Модель для хранения муниципалитетов"""
+
     id = fields.IntField(primary_key=True)
     name = fields.CharField(max_length=128, null=False)
     down_parent_id = fields.IntField(null=True)
@@ -12,7 +12,7 @@ class Municipality(models.Model):
     id_parent = fields.IntField(null=True)
     path_id = ArrayField(null=False)
     level_parent = fields.IntField(null=False)
-    
+
     class Meta:
         schema = "sp_s_subekty"
         table = "v_all_name_mo"
@@ -20,6 +20,7 @@ class Municipality(models.Model):
 
 class AddressV2(models.Model):
     """Модель для адресов"""
+
     id = fields.IntField(primary_key=True)
     id_mo = fields.IntField(null=True)
     district = fields.CharField(max_length=128, null=True)
@@ -31,7 +32,7 @@ class AddressV2(models.Model):
     mkd = fields.BooleanField(default=False)
     is_mobile = fields.BooleanField(default=False)
     from_login = fields.TextField(null=True)
-    
+
     class Meta:
         schema = "s_gazifikacia"
         table = "t_address_v2"
@@ -39,13 +40,14 @@ class AddressV2(models.Model):
 
 class TypeValue(models.Model):
     """Модель для типов значений"""
+
     id = fields.IntField(primary_key=True)
     order = fields.IntField()
     type_value = fields.CharField(max_length=128, null=True)
     for_mobile = fields.BooleanField()
     description = fields.CharField(max_length=256)
     field_type_id = fields.IntField(null=True)
-    
+
     class Meta:
         schema = "s_gazifikacia"
         table = "t_type_value"
@@ -53,6 +55,7 @@ class TypeValue(models.Model):
 
 class GazificationData(models.Model):
     """Модель для данных о газификации"""
+
     id = fields.IntField(primary_key=True)
     id_address = fields.IntField()
     id_type_address = fields.IntField(null=False)
@@ -70,9 +73,10 @@ class GazificationData(models.Model):
 
 class FieldType(models.Model):
     """Модель для типов полей"""
+
     field_type_id = fields.IntField(primary_key=True)
     field_type_name = fields.CharField(max_length=255, null=False)
-    
+
     class Meta:
         schema = "s_gazifikacia"
         table = "field_type"
@@ -80,11 +84,12 @@ class FieldType(models.Model):
 
 class FieldReference(models.Model):
     """Модель для связей между полями"""
+
     field_reference_id = fields.IntField(primary_key=True)
     field_origin_id = fields.IntField(null=False)
     field_origin_value = fields.CharField(max_length=255, null=False)
     field_ref_id = fields.IntField(null=False)
-    
+
     class Meta:
         schema = "s_gazifikacia"
         table = "field_reference"
@@ -92,22 +97,25 @@ class FieldReference(models.Model):
 
 class FieldAnswer(models.Model):
     """Модель для ответов на поля"""
+
     field_answer_id = fields.IntField(primary_key=True)
     field_answer_value = fields.TextField(null=False)
     type_value_id = fields.IntField(null=False)
     field_size = fields.TextField(null=False)
     order = fields.IntField(default=0)
-    
+
     class Meta:
         schema = "s_gazifikacia"
         table = "field_answers"
 
+
 class User(models.Model):
     """Модель для пользователей системы"""
+
     user_id = fields.IntField(pk=True)
     email = fields.CharField(max_length=255, null=False)
     password_hash = fields.CharField(max_length=255, null=False)
-    
+
     class Meta:
         schema = "s_gazifikacia"
         table = "users"
@@ -115,11 +123,12 @@ class User(models.Model):
 
 class Activity(models.Model):
     """Модель для отслеживания активности пользователей"""
+
     session_id = fields.CharField(max_length=255, pk=True)
     email = fields.TextField(null=False)
     activity_count = fields.IntField(default=0)
     date_create = fields.DatetimeField(auto_now_add=True)
-    
+
     class Meta:
         schema = "s_gazifikacia"
         table = "activity"

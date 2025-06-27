@@ -9,39 +9,32 @@ from tortoise.transactions import in_transaction
 
 router = APIRouter()
 
+
 @router.post("/upload", response_model=BaseResponse)
 async def upload_gazification_data(request: GazificationUploadRequest):
     """Отправка записи о газификации"""
     try:
-        # Проверяем существование всех типов значений
         for field in request.fields:
             try:
                 await TypeValue.get(id=field.id)
             except Exception as e:
                 raise ValidationError(f"Тип значения с id={field.id} не найден")
-                
-        # Проверяем наличие адреса или создаем новый
         address_query = AddressV2.filter(
             id_mo=request.address.mo_id,
             street=request.address.street,
-            house=request.address.house
+            house=request.address.house,
         )
-        
         if request.address.district:
             address_query = address_query.filter(district=request.address.district)
         else:
             address_query = address_query.filter(district__isnull=True)
-            
         if request.address.flat:
             address_query = address_query.filter(flat=request.address.flat)
         else:
             address_query = address_query.filter(flat__isnull=True)
-            
         address = await address_query.first()
-        
         async with in_transaction() as conn:
             if not address:
-                # Создаем новый адрес, если он не существует
                 address = await AddressV2.create(
                     id_mo=request.address.mo_id,
                     district=request.address.district,
@@ -49,39 +42,37 @@ async def upload_gazification_data(request: GazificationUploadRequest):
                     house=request.address.house,
                     flat=request.address.flat,
                     is_mobile=True,
-                    from_login=request.from_login
+                    from_login=request.from_login,
                 )
-                log_db_operation("create", "AddressV2", {
-                    "address_id": address.id,
-                    "mo_id": request.address.mo_id,
-                    "district": request.address.district,                    "street": request.address.street,
-                    "house": request.address.house,
-                    "flat": request.address.flat
-                })
-        
+                log_db_operation(
+                    "create",
+                    "AddressV2",
+                    {
+                        "address_id": address.id,
+                        "mo_id": request.address.mo_id,
+                        "district": request.address.district,
+                        "street": request.address.street,
+                        "house": request.address.house,
+                        "flat": request.address.flat,
+                    },
+                )
             for field in request.fields:
                 type_value = await TypeValue.get(id=field.id)
                 await GazificationData.create(
                     id_address=address.id,
-                    id_type_address=4,  # 4 - не подключены (для полей из формы)
+                    id_type_address=4,
                     id_type_value=type_value.id,
                     value=field.value,
                     is_mobile=True,
                     from_login=request.from_login,
-                    date_create=datetime.now(timezone.utc)
+                    date_create=datetime.now(timezone.utc),
                 )
-            
-            log_db_operation("create", "GazificationData", {
-                "address_id": address.id,
-                "fields_count": len(request.fields)
-            })
-            
-            # Записываем активность пользователя
+            log_db_operation(
+                "create",
+                "GazificationData",
+                {"address_id": address.id, "fields_count": len(request.fields)},
+            )
             await record_activity(request.from_login or "unknown", request.session_id)
-        
-        return create_response(
-            data=None,
-            message="Данные успешно сохранены"
-        )
+        return create_response(data=None, message="Данные успешно сохранены")
     except Exception as e:
         raise DatabaseError(f"Ошибка при сохранении данных: {str(e)}")

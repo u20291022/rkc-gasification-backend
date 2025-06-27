@@ -1,9 +1,20 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints.gazification import municipality, district, street, house, flat, add_address, upload, type_values, update_gas_status, export_excel, export_activity, auth
+from app.api.v1.endpoints.gazification import (
+    municipality,
+    district,
+    street,
+    house,
+    flat,
+    add_address,
+    upload,
+    type_values,
+    update_gas_status,
+    export_excel,
+    export_activity,
+    auth,
+)
 
 router = APIRouter()
-
-# Организуем роуты в соответствии с документацией (Опросник Газификация.md)
 router.include_router(municipality.router)
 router.include_router(district.router)
 router.include_router(street.router)
