@@ -4,6 +4,7 @@ from pydantic.generics import GenericModel
 
 T = TypeVar("T")
 
+
 class BaseResponse(GenericModel, Generic[T]):
     ok: bool
     message: str

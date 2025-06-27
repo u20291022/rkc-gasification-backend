@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     DATABASE_URL: str
     LOG_LEVEL: str = "INFO"
@@ -13,8 +14,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
-settings = Settings()
 
+settings = Settings()
 TORTOISE_ORM = {
     "connections": {"default": settings.DATABASE_URL},
     "apps": {
@@ -24,5 +25,5 @@ TORTOISE_ORM = {
         },
     },
     "use_tz": True,
-    "timezone": "UTC"
+    "timezone": "UTC",
 }
