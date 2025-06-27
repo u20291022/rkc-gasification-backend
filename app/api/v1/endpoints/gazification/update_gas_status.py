@@ -37,7 +37,6 @@ async def update_gas_status(request: UpdateGasStatusRequest):
         for address in addresses:
             async with in_transaction() as conn:
                 id_type_address = 4
-                print(request.has_gas)
                 if request.has_gas == "true":
                     id_type_address = 3
                 elif request.has_gas == "not_exist":
