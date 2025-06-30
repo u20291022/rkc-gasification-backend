@@ -77,6 +77,8 @@ async def export_to_excel(
                 gas_status = "Адрес не существует"
             elif address.get("gas_type") == 7:
                 gas_status = "Собственника нет дома"
+            elif address.get("gas_type") == 8:
+                gas_status = "Внесён повторно"
 
             date_create_formatted = None
 
