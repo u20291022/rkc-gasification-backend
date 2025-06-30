@@ -22,7 +22,7 @@ async def get_flats(
     """Получение списка квартир по ID муниципалитета, району, улице и дому"""
     try:
         gazified_addresses = await GazificationData.filter(
-            Q(id_type_address=3) | Q(id_type_address=6)
+            Q(id_type_address=3) | Q(id_type_address=6) | Q(id_type_address=8)
         ).values_list("id_address", flat=True)
         district_flats = (
             await AddressV2.filter(

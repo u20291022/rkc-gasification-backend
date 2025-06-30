@@ -17,7 +17,7 @@ async def get_houses(mo_id: int = Path(), district: str = Path(), street: str = 
     """Получение списка домов по ID муниципалитета, району и улице"""
     try:
         gazified_addresses = await GazificationData.filter(
-            Q(id_type_address=3) | Q(id_type_address=6)
+            Q(id_type_address=3) | Q(id_type_address=6) | Q(id_type_address=8)
         ).values_list("id_address", flat=True)
         street_condition = Q(street=street)
         if street == "" or street == "Нет улиц":

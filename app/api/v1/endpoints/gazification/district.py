@@ -15,7 +15,7 @@ async def get_districts(mo_id: int = Path()):
     """Получение списка районов по ID муниципалитета"""
     try:
         gazified_addresses = await GazificationData.filter(
-            Q(id_type_address=3) | Q(id_type_address=6)
+            Q(id_type_address=3) | Q(id_type_address=6) | Q(id_type_address=8)
         ).values_list("id_address", flat=True)
         district_addresses = (
             await AddressV2.filter(

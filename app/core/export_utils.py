@@ -53,7 +53,7 @@ async def get_gazification_data(
             - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса,
               ключ внутренний - id вопроса, значение - ответ"""
     gazification_status = {}
-    gas_data_filter = Q(id_type_address__in=[3, 4, 6, 7]) & Q(is_mobile=True)
+    gas_data_filter = Q(id_type_address__in=[3, 4, 6, 7, 8]) & Q(is_mobile=True)
     if date_from:
         gas_data_filter = gas_data_filter & Q(date_create__gte=date_from)
     if date_to:
