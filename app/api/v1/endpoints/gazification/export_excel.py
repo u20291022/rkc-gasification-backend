@@ -26,7 +26,6 @@ async def export_to_excel(
         None,
         description="Конечная дата для фильтрации (YYYY-MM-DD или YYYY-MM-DDTHH:MM:SS)",
     ),
-    only_new: Optional[bool] = Query(False, description="Выгружать только новые записи с последней выгрузки"),
     client_source: Optional[str] = Query("web", description="Источник запроса (web, bot, api)"),
 ):
     """
@@ -38,7 +37,7 @@ async def export_to_excel(
         dt_from = parse_date(date_from, is_start=True)
         dt_to = parse_date(date_to, is_start=False)
         addresses, questions, answers = await get_optimized_gazification_data(
-            mo_id, district, street, dt_from, dt_to, only_new, "excel"
+            mo_id, district, street, dt_from, dt_to, "excel"
         )
 
         if not addresses:
@@ -152,7 +151,6 @@ async def export_to_excel(
                     "street": street,
                     "date_from": dt_from.isoformat() if dt_from else None,
                     "date_to": dt_to.isoformat() if dt_to else None,
-                    "only_new": only_new,
                     "client_source": client_source,
                     "rows": len(data),
                     "questions": len(questions),

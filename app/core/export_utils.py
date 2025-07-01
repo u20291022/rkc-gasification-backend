@@ -42,8 +42,6 @@ async def get_gazification_data(
     street: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    only_new_records: bool = False,
-    last_export_date: Optional[datetime] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
     """
     Получает данные о газификации на основе фильтров
@@ -54,8 +52,6 @@ async def get_gazification_data(
         street: Название улицы (опционально)
         date_from: Начальная дата для фильтрации (опционально)
         date_to: Конечная дата для фильтрации (опционально)
-        only_new_records: Флаг для получения только новых записей (опционально)
-        last_export_date: Дата последней выгрузки для фильтрации новых записей (опционально)
     Returns:
         Tuple[List[Dict], List[Dict], Dict[int, Dict[int, str]]]: (addresses, questions, answers)
             - addresses: список адресов, соответствующих фильтрам
@@ -66,9 +62,7 @@ async def get_gazification_data(
     gas_data_filter = Q(id_type_address__in=[3, 4, 6, 7, 8]) & Q(is_mobile=True) & Q(deleted=False)
     
     # Применение фильтров по датам
-    if only_new_records and last_export_date:
-        gas_data_filter = gas_data_filter & Q(date_create__gt=last_export_date)
-    elif date_from:
+    if date_from:
         gas_data_filter = gas_data_filter & Q(date_create__gte=date_from)
     if date_to:
         gas_data_filter = gas_data_filter & Q(date_create__lte=date_to)
@@ -81,10 +75,7 @@ async def get_gazification_data(
     date_filter_sql = ""
     params = []
     
-    if only_new_records and last_export_date:
-        date_filter_sql = "AND date_create > %s"
-        params.append(last_export_date)
-    elif date_from:
+    if date_from:
         date_filter_sql = "AND date_create >= %s"
         params.append(date_from)
     
@@ -217,10 +208,7 @@ async def get_gazification_data(
         answers_params = []
         date_filter_answers = ""
         
-        if only_new_records and last_export_date:
-            date_filter_answers = "AND date_create > %s"
-            answers_params.append(last_export_date)
-        elif date_from:
+        if date_from:
             date_filter_answers = "AND date_create >= %s"
             answers_params.append(date_from)
             
@@ -310,7 +298,6 @@ async def get_optimized_gazification_data(
     street: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    only_new_since_last_export: bool = False,
     export_type: str = "excel",
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
     """
@@ -322,6 +309,4 @@ async def get_optimized_gazification_data(
         street=street,
         date_from=date_from,
         date_to=date_to,
-        only_new_records=only_new_since_last_export,
-        last_export_date=None  # Логика для получения последней даты экспорта убрана
     )
