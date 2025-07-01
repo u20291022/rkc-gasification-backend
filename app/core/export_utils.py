@@ -76,17 +76,18 @@ async def get_gazification_data(
     params = []
     
     if date_from:
-        date_filter_sql = "AND date_create >= %s"
+        date_filter_sql = "AND date_create >= $1"
         params.append(date_from)
     
     if date_to:
         if date_filter_sql:
-            date_filter_sql += " AND date_create <= %s"
+            date_filter_sql += f" AND date_create <= ${len(params) + 1}"
         else:
-            date_filter_sql = "AND date_create <= %s"
+            date_filter_sql = "AND date_create <= $1"
         params.append(date_to)
     
     # Получаем последние записи газификации для каждого адреса с дополнительными фильтрами
+    mo_param_num = len(params) + 1 if mo_id is not None else None
     latest_gas_records_query = f"""
         SELECT DISTINCT ON (gd.id_address) 
             gd.id_address, gd.id_type_address, gd.date_create, gd.from_login,
@@ -98,14 +99,14 @@ async def get_gazification_data(
             AND gd.deleted = false
             AND a.deleted = false
             AND a.house IS NOT NULL
-            {("AND a.id_mo = %s" if mo_id is not None else "")}
+            {(f"AND a.id_mo = ${mo_param_num}" if mo_id is not None else "")}
             {date_filter_sql}
         ORDER BY gd.id_address, gd.date_create DESC
     """
     
     # Добавляем параметр mo_id если нужно
     if mo_id is not None:
-        params.insert(-len([p for p in [date_from, date_to] if p is not None]) if date_filter_sql else 0, mo_id)
+        params.append(mo_id)
     
     # Выполняем оптимизированный запрос
     connection = Tortoise.get_connection("default")
@@ -209,21 +210,21 @@ async def get_gazification_data(
         date_filter_answers = ""
         
         if date_from:
-            date_filter_answers = "AND date_create >= %s"
+            date_filter_answers = "AND date_create >= $2"
             answers_params.append(date_from)
             
         if date_to:
             if date_filter_answers:
-                date_filter_answers += " AND date_create <= %s"
+                date_filter_answers += f" AND date_create <= ${len(answers_params) + 2}"
             else:
-                date_filter_answers = "AND date_create <= %s"
+                date_filter_answers = "AND date_create <= $2"
             answers_params.append(date_to)
         
         latest_answers_query = f"""
             SELECT DISTINCT ON (id_address, id_type_value) 
                 id_address, id_type_value, value
             FROM s_gazifikacia.t_gazifikacia_data 
-            WHERE id_address = ANY(%s)
+            WHERE id_address = ANY($1)
                 AND id_type_value IS NOT NULL 
                 AND is_mobile = true 
                 AND deleted = false
