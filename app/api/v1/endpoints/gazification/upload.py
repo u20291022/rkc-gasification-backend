@@ -23,6 +23,7 @@ async def upload_gazification_data(request: GazificationUploadRequest):
             id_mo=request.address.mo_id,
             street=request.address.street,
             house=request.address.house,
+            deleted=False,
         )
         if request.address.district:
             address_query = address_query.filter(district=request.address.district)
@@ -56,6 +57,12 @@ async def upload_gazification_data(request: GazificationUploadRequest):
                         "flat": request.address.flat,
                     },
                 )
+            # Помечаем все существующие записи газификации по адресу как удаленные
+            await GazificationData.filter(
+                id_address=address.id,
+                deleted=False
+            ).update(deleted=True)
+            
             for field in request.fields:
                 type_value = await TypeValue.get(id=field.id)
                 await GazificationData.create(

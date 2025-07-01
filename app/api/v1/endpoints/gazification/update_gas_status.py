@@ -16,7 +16,7 @@ async def update_gas_status(request: UpdateGasStatusRequest):
     """Обновление статуса газификации для существующего адреса"""
     try:
         address_query = AddressV2.filter(
-            id_mo=request.mo_id, street=request.street, house=request.house
+            id_mo=request.mo_id, street=request.street, house=request.house, deleted=False
         )
         if request.district:
             address_query = address_query.filter(
@@ -44,31 +44,20 @@ async def update_gas_status(request: UpdateGasStatusRequest):
                     id_type_address = 6
                 elif request.has_gas == "not_at_home":
                     id_type_address = 7
-                gazification_data = await GazificationData.filter(
-                    id_address=address.id
-                ).all()
-                if gazification_data:
-                    for gaz_data_curr in gazification_data:
-                        gaz_data_curr.id_type_address = id_type_address
-                        gaz_data_curr.from_login = request.from_login
-                        gaz_data_curr.is_mobile = True
-                        gaz_data_curr.date_create = datetime.now(timezone.utc)
-                        await gaz_data_curr.save(
-                            update_fields=[
-                                "id_type_address",
-                                "from_login",
-                                "is_mobile",
-                                "date_create",
-                            ]
-                        )
-                else:
-                    await GazificationData.create(
-                        id_address=address.id,
-                        id_type_address=id_type_address,
-                        is_mobile=True,
-                        from_login=request.from_login,
-                        date_create=datetime.now(timezone.utc),
-                    )
+                # Помечаем все существующие записи как удаленные
+                await GazificationData.filter(
+                    id_address=address.id,
+                    deleted=False
+                ).update(deleted=True)
+                
+                # Создаем новую запись со статусом газификации
+                await GazificationData.create(
+                    id_address=address.id,
+                    id_type_address=id_type_address,
+                    is_mobile=True,
+                    from_login=request.from_login,
+                    date_create=datetime.now(timezone.utc),
+                )
                 log_db_operation(
                     "update",
                     "GazificationData",

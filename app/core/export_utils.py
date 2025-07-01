@@ -37,6 +37,8 @@ async def get_gazification_data(
     street: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
+    only_new_records: bool = False,
+    last_export_date: Optional[datetime] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
     """
     Получает данные о газификации на основе фильтров
@@ -46,109 +48,150 @@ async def get_gazification_data(
         street: Название улицы (опционально)
         date_from: Начальная дата для фильтрации (опционально)
         date_to: Конечная дата для фильтрации (опционально)
+        only_new_records: Флаг для получения только новых записей (опционально)
+        last_export_date: Дата последней выгрузки для фильтрации новых записей (опционально)
     Returns:
         Tuple[List[Dict], List[Dict], Dict[int, Dict[int, str]]]: (addresses, questions, answers)
             - addresses: список адресов, соответствующих фильтрам
             - questions: список вопросов (TypeValue) для отображения в отчете
             - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса,
               ключ внутренний - id вопроса, значение - ответ"""
-    gazification_status = {}
-    gas_data_filter = Q(id_type_address__in=[3, 4, 6, 7, 8]) & Q(is_mobile=True)
-    if date_from:
+    # Построение базового фильтра для данных газификации
+    gas_data_filter = Q(id_type_address__in=[3, 4, 6, 7, 8]) & Q(is_mobile=True) & Q(deleted=False)
+    
+    # Применение фильтров по датам
+    if only_new_records and last_export_date:
+        gas_data_filter = gas_data_filter & Q(date_create__gt=last_export_date)
+    elif date_from:
         gas_data_filter = gas_data_filter & Q(date_create__gte=date_from)
     if date_to:
         gas_data_filter = gas_data_filter & Q(date_create__lte=date_to)
-    gas_status_data = await GazificationData.filter(gas_data_filter).values(
-        "id_address", "id_type_address", "date_create", "from_login"
-    )
+    
+    # Оптимизированный запрос для получения последних записей по каждому адресу
+    # Используем единый SQL запрос для получения всех данных сразу
+    from tortoise import Tortoise
+    
+    # Строим базовый фильтр для дат
+    date_filter_sql = ""
+    params = []
+    
+    if only_new_records and last_export_date:
+        date_filter_sql = "AND date_create > %s"
+        params.append(last_export_date)
+    elif date_from:
+        date_filter_sql = "AND date_create >= %s"
+        params.append(date_from)
+    
+    if date_to:
+        if date_filter_sql:
+            date_filter_sql += " AND date_create <= %s"
+        else:
+            date_filter_sql = "AND date_create <= %s"
+        params.append(date_to)
+    
+    # Получаем последние записи газификации для каждого адреса с дополнительными фильтрами
+    latest_gas_records_query = f"""
+        SELECT DISTINCT ON (gd.id_address) 
+            gd.id_address, gd.id_type_address, gd.date_create, gd.from_login,
+            a.id_mo, a.district, a.city, a.street, a.house, a.flat, a.from_login as address_from_login
+        FROM s_gazifikacia.t_gazifikacia_data gd
+        JOIN s_gazifikacia.t_address_v2 a ON gd.id_address = a.id
+        WHERE gd.id_type_address IN (3, 4, 6, 7, 8) 
+            AND gd.is_mobile = true 
+            AND gd.deleted = false
+            AND a.deleted = false
+            AND a.house IS NOT NULL
+            {("AND a.id_mo = %s" if mo_id is not None else "")}
+            {date_filter_sql}
+        ORDER BY gd.id_address, gd.date_create DESC
+    """
+    
+    # Добавляем параметр mo_id если нужно
+    if mo_id is not None:
+        params.insert(-len([p for p in [date_from, date_to] if p is not None]) if date_filter_sql else 0, mo_id)
+    
+    # Выполняем оптимизированный запрос
+    connection = Tortoise.get_connection("default")
+    combined_data = await connection.execute_query_dict(latest_gas_records_query, params)
+    # Обрабатываем результаты запроса
     address_gas_info = {}
-    for item in gas_status_data:
+    gazification_status = {}
+    addresses = []
+    
+    for item in combined_data:
         address_id = item["id_address"]
         type_address = item["id_type_address"]
         date_create = item["date_create"]
         from_login = item["from_login"]
-        if (
-            address_id not in address_gas_info
-            or date_create > address_gas_info[address_id]["date_create"]
-        ):
-            address_gas_info[address_id] = {
-                "gas_type": type_address,
-                "date_create": date_create,
-                "from_login": from_login,
-            }
-    gazification_status = {
-        addr_id: info["gas_type"] for addr_id, info in address_gas_info.items()
-    }
-    addresses_with_gas_info = list(gazification_status.keys())
-    if addresses_with_gas_info:
-        base_filter = Q(house__isnull=False) & Q(id__in=addresses_with_gas_info)
-    else:
-        base_filter = Q(house__isnull=False)
-    if mo_id is not None:
-        base_filter = base_filter & Q(id_mo=mo_id)
-    query = AddressV2.filter(base_filter)
-    if district:
-        normalized_district = district.strip().lower()
-        query = query.annotate(
-            district_lower=Lower("district"), city_lower=Lower("city")
-        ).filter(
-            (Q(district_lower=normalized_district))
-            | (Q(district__isnull=True) & Q(city_lower=normalized_district))
-        )
-    if street:
-        normalized_street = street.strip().lower()
-        query = query.annotate(street_lower=Lower("street")).filter(
-            street_lower=normalized_street
-        )
-    addresses = await query.values(
-        "id", "id_mo", "district", "city", "street", "house", "flat", "from_login"
-    )
-    log_db_operation(
-        "read",
-        "AddressV2",
-        {
-            "mo_id": mo_id,
-            "district": district,
-            "street": street,
-            "date_from": date_from.isoformat() if date_from else None,
-            "date_to": date_to.isoformat() if date_to else None,
-            "count": len(addresses),
-        },
-    )
-    filtered_addresses = []
-    for address in addresses:
-        district = (
-            address.get("district", "").strip() if address.get("district") else ""
-        )
-        city = address.get("city", "").strip() if address.get("city") else ""
-        street = address.get("street", "").strip() if address.get("street") else ""
-        house = address.get("house", "").strip() if address.get("house") else ""
-        flat = address.get("flat", "").strip() if address.get("flat") else ""
-        if (not district and not city) or not house:
-            continue
-        address["district"] = district if district else None
-        address["city"] = city if city else None
-        address["street"] = street if street else None
-        address["house"] = house if house else None
-        address["flat"] = flat if flat else None
-        if address["street"] == "Нет улиц":
-            address["street"] = ""
-        address_id = address["id"]
-        if address_id in gazification_status:
-            address["gas_type"] = gazification_status[address_id]
-        if address_id in address_gas_info:
-            address["date_create"] = address_gas_info[address_id]["date_create"]
-            address["gas_from_login"] = address_gas_info[address_id]["from_login"]
-        filtered_addresses.append(address)
-    addresses = filtered_addresses
+        
+        # Сохраняем информацию о газификации
+        address_gas_info[address_id] = {
+            "gas_type": type_address,
+            "date_create": date_create,
+            "from_login": from_login,
+        }
+        gazification_status[address_id] = type_address
+        
+        # Формируем информацию об адресе
+        address = {
+            "id": address_id,
+            "id_mo": item["id_mo"],
+            "district": item["district"],
+            "city": item["city"],
+            "street": item["street"] if item["street"] != "Нет улиц" else "",
+            "house": item["house"],
+            "flat": item["flat"] or "",
+            "from_login": item["address_from_login"],
+            "gas_type": type_address,
+            "date_create": date_create,
+            "gas_from_login": from_login,
+        }
+        addresses.append(address)
+    
+    # Применяем фильтры по району и улице, если они заданы
+    if district or street:
+        filtered_addresses = []
+        for address in addresses:
+            if district:
+                normalized_district = district.strip().lower()
+                address_district = (address.get("district") or "").strip().lower()
+                address_city = (address.get("city") or "").strip().lower()
+                if not (address_district == normalized_district or address_city == normalized_district):
+                    continue
+            
+            if street:
+                normalized_street = street.strip().lower()
+                address_street = (address.get("street") or "").strip().lower()
+                if address_street != normalized_street:
+                    continue
+                    
+            filtered_addresses.append(address)
+        addresses = filtered_addresses
+    # Получаем информацию о муниципалитетах
     mo_ids = {address["id_mo"] for address in addresses if address["id_mo"] is not None}
-    municipalities = await Municipality.filter(id__in=mo_ids).values("id", "name")
-    mo_names = {mo["id"]: mo["name"] for mo in municipalities}
+    if mo_ids:
+        municipalities = await Municipality.filter(id__in=mo_ids).values("id", "name")
+        mo_names = {mo["id"]: mo["name"] for mo in municipalities}
+        
+        # Добавляем название муниципалитета к каждому адресу
+        for address in addresses:
+            mo_id = address.get("id_mo")
+            if mo_id and mo_id in mo_names:
+                address["mo_name"] = mo_names[mo_id]
+            else:
+                address["mo_name"] = "Неизвестный муниципалитет"
+    else:
+        for address in addresses:
+            address["mo_name"] = "Неизвестный муниципалитет"
+    
+    # Получаем типы полей для фильтрации
     field_types = await FieldType.all()
     field_type_mapping = {ft.field_type_id: ft.field_type_name for ft in field_types}
     info_field_type_ids = [
         field_id for field_id, name in field_type_mapping.items() if name == "info"
     ]
+    
+    # Получаем вопросы для мобильного приложения
     questions = (
         await TypeValue.filter(for_mobile=True)
         .exclude(field_type_id__in=info_field_type_ids)
@@ -159,30 +202,73 @@ async def get_gazification_data(
         field_type_id = question.get("field_type_id")
         if field_type_id:
             question["field_type"] = field_type_mapping.get(field_type_id)
-    log_db_operation("read", "TypeValue", {"count": len(questions)})
-    for address in addresses:
-        mo_id = address.get("id_mo")
-        if mo_id and mo_id in mo_names:
-            address["mo_name"] = mo_names[mo_id]
-        else:
-            address["mo_name"] = "Неизвестный муниципалитет"
+    # Оптимизированное получение ответов - только последние ответы по каждому адресу и вопросу
     address_ids = [address["id"] for address in addresses]
-    answers_data = await GazificationData.filter(
-        id_address__in=address_ids, id_type_value__isnull=False, is_mobile=True
-    ).values("id_address", "id_type_value", "value")
     answers = {}
-    for answer in answers_data:
-        address_id = answer["id_address"]
-        type_value_id = answer["id_type_value"]
-        value = answer["value"]
-        if value and value.lower() == "true":
-            value = "Да"
-        elif value and value.lower() == "false":
-            value = "Нет"
-        if address_id not in answers:
-            answers[address_id] = {}
-        answers[address_id][type_value_id] = value
-    log_db_operation("read", "GazificationData", {"count": len(answers_data)})
+    
+    if address_ids:
+        # Используем SQL для получения последних ответов по каждому адресу и типу вопроса
+        answers_params = []
+        date_filter_answers = ""
+        
+        if only_new_records and last_export_date:
+            date_filter_answers = "AND date_create > %s"
+            answers_params.append(last_export_date)
+        elif date_from:
+            date_filter_answers = "AND date_create >= %s"
+            answers_params.append(date_from)
+            
+        if date_to:
+            if date_filter_answers:
+                date_filter_answers += " AND date_create <= %s"
+            else:
+                date_filter_answers = "AND date_create <= %s"
+            answers_params.append(date_to)
+        
+        latest_answers_query = f"""
+            SELECT DISTINCT ON (id_address, id_type_value) 
+                id_address, id_type_value, value
+            FROM s_gazifikacia.t_gazifikacia_data 
+            WHERE id_address = ANY(%s)
+                AND id_type_value IS NOT NULL 
+                AND is_mobile = true 
+                AND deleted = false
+                {date_filter_answers}
+            ORDER BY id_address, id_type_value, date_create DESC
+        """
+        
+        answers_data = await connection.execute_query_dict(
+            latest_answers_query, 
+            [address_ids] + answers_params
+        )
+        
+        for answer in answers_data:
+            address_id = answer["id_address"]
+            type_value_id = answer["id_type_value"]
+            value = answer["value"]
+            if value and value.lower() == "true":
+                value = "Да"
+            elif value and value.lower() == "false":
+                value = "Нет"
+            if address_id not in answers:
+                answers[address_id] = {}
+            answers[address_id][type_value_id] = value
+    
+    log_db_operation(
+        "read",
+        "export_data",
+        {
+            "mo_id": mo_id,
+            "district": district,
+            "street": street,
+            "date_from": date_from.isoformat() if date_from else None,
+            "date_to": date_to.isoformat() if date_to else None,
+            "addresses_count": len(addresses),
+            "questions_count": len(questions),
+            "answers_count": len(answers),
+        },
+    )
+    
     return addresses, questions, answers
 
 
@@ -209,3 +295,26 @@ async def get_activity_data(
     )
     log_db_operation("read", "Activity", {"count": len(activities)})
     return activities
+
+
+async def get_optimized_gazification_data(
+    mo_id: Optional[int] = None,
+    district: Optional[str] = None,
+    street: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    only_new_since_last_export: bool = False,
+    export_type: str = "excel",
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
+    """
+    Оптимизированная функция получения данных о газификации
+    """
+    return await get_gazification_data(
+        mo_id=mo_id,
+        district=district,
+        street=street,
+        date_from=date_from,
+        date_to=date_to,
+        only_new_records=only_new_since_last_export,
+        last_export_date=None  # Логика для получения последней даты экспорта убрана
+    )
