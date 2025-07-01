@@ -58,15 +58,6 @@ async def get_gazification_data(
             - questions: список вопросов (TypeValue) для отображения в отчете
             - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса,
               ключ внутренний - id вопроса, значение - ответ"""
-    # Построение базового фильтра для данных газификации
-    gas_data_filter = Q(id_type_address__in=[3, 4, 6, 7, 8]) & Q(is_mobile=True) & Q(deleted=False)
-    
-    # Применение фильтров по датам
-    if date_from:
-        gas_data_filter = gas_data_filter & Q(date_create__gte=date_from)
-    if date_to:
-        gas_data_filter = gas_data_filter & Q(date_create__lte=date_to)
-    
     # Оптимизированный запрос для получения последних записей по каждому адресу
     # Используем единый SQL запрос для получения всех данных сразу
     from tortoise import Tortoise
@@ -76,14 +67,14 @@ async def get_gazification_data(
     params = []
     
     if date_from:
-        date_filter_sql = "AND date_create >= $1"
+        date_filter_sql = "AND gd.date_create >= $1"
         params.append(date_from)
     
     if date_to:
         if date_filter_sql:
-            date_filter_sql += f" AND date_create <= ${len(params) + 1}"
+            date_filter_sql += f" AND gd.date_create <= ${len(params) + 1}"
         else:
-            date_filter_sql = "AND date_create <= $1"
+            date_filter_sql = "AND gd.date_create <= $1"
         params.append(date_to)
     
     # Получаем последние записи газификации для каждого адреса с дополнительными фильтрами
