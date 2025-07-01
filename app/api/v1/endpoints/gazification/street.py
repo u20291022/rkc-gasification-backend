@@ -18,7 +18,7 @@ async def get_streets(mo_id: int = Path(), district: str = Path()):
     try:
         normalized_district = district.strip().lower()
         gazified_addresses = await GazificationData.filter(
-            Q(id_type_address=3) | Q(id_type_address=6)
+            (Q(id_type_address=3) | Q(id_type_address=6) | Q(id_type_address=8)) & Q(deleted=False)
         ).values_list("id_address", flat=True)
         district_streets = (
             await AddressV2.filter(
@@ -29,6 +29,7 @@ async def get_streets(mo_id: int = Path(), district: str = Path()):
                 & Q(street__isnull=False)
                 & ~Q(street="")
                 & ~Q(id__in=gazified_addresses)
+                & Q(deleted=False)
             )
             .distinct()
             .values_list("street", "district", flat=False)
@@ -43,6 +44,7 @@ async def get_streets(mo_id: int = Path(), district: str = Path()):
                 & Q(street__isnull=False)
                 & ~Q(street="")
                 & ~Q(id__in=gazified_addresses)
+                & Q(deleted=False)
             )
             .distinct()
             .values_list("street", "city", flat=False)

@@ -26,7 +26,7 @@ async def add_address(request: AddressCreateRequest):
             house = request.house.strip() if request.house else None
             house = house if house else None
             flat = request.flat.strip() if request.flat else None
-            flat = flat if flat else None
+            flat = flat.lower() if flat else None
             address = await AddressV2.create(
                 id_mo=request.mo_id,
                 district=district,

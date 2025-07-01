@@ -14,13 +14,14 @@ async def get_municipalities():
     """Получение списка муниципалитетов"""
     try:
         gazified_addresses = await GazificationData.filter(
-            id_type_address=3
+            id_type_address=3, deleted=False
         ).values_list("id_address", flat=True)
         valid_mo_ids = (
             await AddressV2.filter(
                 Q(house__isnull=False)
                 & Q(id_mo__isnull=False)
                 & ~Q(id__in=gazified_addresses)
+                & Q(deleted=False)
             )
             .distinct()
             .values_list("id_mo", flat=True)
