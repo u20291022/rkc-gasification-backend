@@ -24,7 +24,7 @@ async def add_address(request: AddressCreateRequest):
             street = request.street.strip() if request.street else None
             street = street if street else None
             house = request.house.strip() if request.house else None
-            house = house if house else None
+            house = house.lower() if house else None
             flat = request.flat.strip() if request.flat else None
             flat = flat.lower() if flat else None
             address = await AddressV2.create(

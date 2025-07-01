@@ -1,19 +1,24 @@
-from http.client import HTTPException
 from tortoise.expressions import Q, Case, When, F
 from tortoise.functions import Lower
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import date, datetime, timedelta
-from app.models.models import (
-    AddressV2,
-    TypeValue,
-    FieldType,
-    GazificationData,
-    Municipality,
-)
+from fastapi import HTTPException
+from app.models.models import AddressV2, TypeValue, FieldType, GazificationData, Municipality
 from app.core.utils import log_db_operation
 
 
 def parse_date(date_str, is_start=True):
+    """
+    Парсит строку даты в различных форматах
+    
+    Args:
+        date_str: Строка с датой
+        is_start: Если True, то для даты без времени устанавливается начало дня,
+                 если False - конец дня
+    
+    Returns:
+        datetime объект или None
+    """
     if not date_str:
         return None
     try:
@@ -32,41 +37,27 @@ def parse_date(date_str, is_start=True):
 
 
 async def get_gazification_data(
-    mo_id: Optional[int] = None,
-    district: Optional[str] = None,
+    mo_id: Optional[int] = None, 
+    district: Optional[str] = None, 
     street: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    only_new_records: bool = False,
-    last_export_date: Optional[datetime] = None,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
     """
     Получает данные о газификации на основе фильтров
+    
     Args:
         mo_id: ID муниципалитета (опционально)
         district: Название района (опционально)
         street: Название улицы (опционально)
         date_from: Начальная дата для фильтрации (опционально)
         date_to: Конечная дата для фильтрации (опционально)
-        only_new_records: Флаг для получения только новых записей (опционально)
-        last_export_date: Дата последней выгрузки для фильтрации новых записей (опционально)
     Returns:
         Tuple[List[Dict], List[Dict], Dict[int, Dict[int, str]]]: (addresses, questions, answers)
             - addresses: список адресов, соответствующих фильтрам
             - questions: список вопросов (TypeValue) для отображения в отчете
             - answers: словарь ответов на вопросы по адресам, где ключ внешний - id адреса,
               ключ внутренний - id вопроса, значение - ответ"""
-    # Построение базового фильтра для данных газификации
-    gas_data_filter = Q(id_type_address__in=[3, 4, 6, 7, 8]) & Q(is_mobile=True) & Q(deleted=False)
-    
-    # Применение фильтров по датам
-    if only_new_records and last_export_date:
-        gas_data_filter = gas_data_filter & Q(date_create__gt=last_export_date)
-    elif date_from:
-        gas_data_filter = gas_data_filter & Q(date_create__gte=date_from)
-    if date_to:
-        gas_data_filter = gas_data_filter & Q(date_create__lte=date_to)
-    
     # Оптимизированный запрос для получения последних записей по каждому адресу
     # Используем единый SQL запрос для получения всех данных сразу
     from tortoise import Tortoise
@@ -75,21 +66,19 @@ async def get_gazification_data(
     date_filter_sql = ""
     params = []
     
-    if only_new_records and last_export_date:
-        date_filter_sql = "AND date_create > %s"
-        params.append(last_export_date)
-    elif date_from:
-        date_filter_sql = "AND date_create >= %s"
+    if date_from:
+        date_filter_sql = "AND gd.date_create >= $1"
         params.append(date_from)
     
     if date_to:
         if date_filter_sql:
-            date_filter_sql += " AND date_create <= %s"
+            date_filter_sql += f" AND gd.date_create <= ${len(params) + 1}"
         else:
-            date_filter_sql = "AND date_create <= %s"
+            date_filter_sql = "AND gd.date_create <= $1"
         params.append(date_to)
     
     # Получаем последние записи газификации для каждого адреса с дополнительными фильтрами
+    mo_param_num = len(params) + 1 if mo_id is not None else None
     latest_gas_records_query = f"""
         SELECT DISTINCT ON (gd.id_address) 
             gd.id_address, gd.id_type_address, gd.date_create, gd.from_login,
@@ -101,14 +90,14 @@ async def get_gazification_data(
             AND gd.deleted = false
             AND a.deleted = false
             AND a.house IS NOT NULL
-            {("AND a.id_mo = %s" if mo_id is not None else "")}
+            {(f"AND a.id_mo = ${mo_param_num}" if mo_id is not None else "")}
             {date_filter_sql}
         ORDER BY gd.id_address, gd.date_create DESC
     """
     
     # Добавляем параметр mo_id если нужно
     if mo_id is not None:
-        params.insert(-len([p for p in [date_from, date_to] if p is not None]) if date_filter_sql else 0, mo_id)
+        params.append(mo_id)
     
     # Выполняем оптимизированный запрос
     connection = Tortoise.get_connection("default")
@@ -211,25 +200,22 @@ async def get_gazification_data(
         answers_params = []
         date_filter_answers = ""
         
-        if only_new_records and last_export_date:
-            date_filter_answers = "AND date_create > %s"
-            answers_params.append(last_export_date)
-        elif date_from:
-            date_filter_answers = "AND date_create >= %s"
+        if date_from:
+            date_filter_answers = "AND date_create >= $2"
             answers_params.append(date_from)
             
         if date_to:
             if date_filter_answers:
-                date_filter_answers += " AND date_create <= %s"
+                date_filter_answers += f" AND date_create <= ${len(answers_params) + 2}"
             else:
-                date_filter_answers = "AND date_create <= %s"
+                date_filter_answers = "AND date_create <= $2"
             answers_params.append(date_to)
         
         latest_answers_query = f"""
             SELECT DISTINCT ON (id_address, id_type_value) 
                 id_address, id_type_value, value
             FROM s_gazifikacia.t_gazifikacia_data 
-            WHERE id_address = ANY(%s)
+            WHERE id_address = ANY($1)
                 AND id_type_value IS NOT NULL 
                 AND is_mobile = true 
                 AND deleted = false
@@ -253,7 +239,6 @@ async def get_gazification_data(
             if address_id not in answers:
                 answers[address_id] = {}
             answers[address_id][type_value_id] = value
-    
     log_db_operation(
         "read",
         "export_data",
@@ -273,25 +258,27 @@ async def get_gazification_data(
 
 
 async def get_activity_data(
-    date_from: Optional[date] = None, date_to: Optional[date] = None
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None
 ) -> List[Dict[str, Any]]:
     """
     Получает данные активности пользователей
+    
     Args:
         date_from: Начальная дата для фильтрации (опционально)
         date_to: Конечная дата для фильтрации (опционально)
+        
     Returns:
         List[Dict[str, Any]]: список записей активности
     """
     from app.models.models import Activity
-
     query = Activity.all()
     if date_from:
         query = query.filter(date_create__gte=date_from)
     if date_to:
         query = query.filter(date_create__lte=date_to)
-    activities = await query.order_by("-date_create").values(
-        "email", "activity_count", "date_create"
+    activities = await query.order_by('-date_create').values(
+        'email', 'activity_count', 'date_create'
     )
     log_db_operation("read", "Activity", {"count": len(activities)})
     return activities
@@ -303,7 +290,6 @@ async def get_optimized_gazification_data(
     street: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    only_new_since_last_export: bool = False,
     export_type: str = "excel",
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
     """
@@ -315,6 +301,4 @@ async def get_optimized_gazification_data(
         street=street,
         date_from=date_from,
         date_to=date_to,
-        only_new_records=only_new_since_last_export,
-        last_export_date=None  # Логика для получения последней даты экспорта убрана
     )
