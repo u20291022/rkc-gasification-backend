@@ -1,9 +1,40 @@
 from tortoise.expressions import Q, Case, When, F
 from tortoise.functions import Lower
 from typing import Optional, List, Dict, Any, Tuple
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from fastapi import HTTPException
 from app.models.models import AddressV2, TypeValue, FieldType, GazificationData, Municipality
 from app.core.utils import log_db_operation
+
+
+def parse_date(date_str, is_start=True):
+    """
+    Парсит строку даты в различных форматах
+    
+    Args:
+        date_str: Строка с датой
+        is_start: Если True, то для даты без времени устанавливается начало дня,
+                 если False - конец дня
+    
+    Returns:
+        datetime объект или None
+    """
+    if not date_str:
+        return None
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        return dt if is_start else dt + timedelta(days=1) - timedelta(microseconds=1)
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S.%f")
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Неверный формат даты: {date_str}")
+
 
 async def get_gazification_data(
     mo_id: Optional[int] = None, 
