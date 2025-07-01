@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
 from app.core.utils import create_response, log_db_operation, record_activity
 from app.schemas.base import BaseResponse
@@ -6,6 +6,7 @@ from app.schemas.gazification import AddressCreateRequest
 from app.models.models import AddressV2, GazificationData, TypeValue
 from app.core.exceptions import DatabaseError
 from tortoise.transactions import in_transaction
+from tortoise.expressions import Q
 
 router = APIRouter()
 
@@ -27,6 +28,25 @@ async def add_address(request: AddressCreateRequest):
             house = house.lower() if house else None
             flat = request.flat.strip() if request.flat else None
             flat = flat.lower() if flat else None
+            
+            # Проверяем, не существует ли уже такой адрес
+            # Район может быть как в поле district, так и в city
+            existing_address = await AddressV2.filter(
+                Q(
+                    (Q(district=district) | Q(city=district)) &
+                    Q(street=street) &
+                    Q(house=house) &
+                    Q(flat=flat) &
+                    Q(deleted=False)
+                )
+            ).first()
+            
+            if existing_address:
+                return create_response(
+                    data=None, 
+                    message=f"Адрес уже существует в базе данных (ID: {existing_address.id})"
+                )
+            
             address = await AddressV2.create(
                 id_mo=request.mo_id,
                 district=district,
