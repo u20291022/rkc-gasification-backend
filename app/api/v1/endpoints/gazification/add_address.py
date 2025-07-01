@@ -44,7 +44,7 @@ async def add_address(request: AddressCreateRequest):
             if existing_address:
                 return create_response(
                     data=None, 
-                    message=f"Адрес уже существует в базе данных (ID: {existing_address.id})"
+                    message=f"Адрес уже существует в базе данных"
                 )
             
             address = await AddressV2.create(
