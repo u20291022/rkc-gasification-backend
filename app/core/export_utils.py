@@ -98,7 +98,7 @@ async def get_gazification_data(
             a.id_mo, a.district, a.city, a.street, a.house, a.flat, a.from_login as address_from_login
         FROM s_gazifikacia.t_gazifikacia_data gd
         JOIN s_gazifikacia.t_address_v2 a ON gd.id_address = a.id
-        WHERE gd.id_type_address IN (3, 4, 6, 7, 8) 
+        WHERE gd.id_type_address IN (3, 4, 6, 7) 
             AND gd.is_mobile = true 
             AND gd.deleted = false
             AND a.deleted = false
