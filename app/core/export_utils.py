@@ -78,7 +78,20 @@ async def get_gazification_data(
         params.append(date_to)
     
     # Получаем последние записи газификации для каждого адреса с дополнительными фильтрами
-    mo_param_num = len(params) + 1 if mo_id is not None else None
+    district_filter_sql = ""
+    mo_filter_sql = ""
+    
+    # Добавляем параметры в правильном порядке
+    if district:
+        district_param_num = len(params) + 1
+        district_filter_sql = f"AND (LOWER(a.district) = LOWER(${district_param_num}) OR LOWER(a.city) = LOWER(${district_param_num}))"
+        params.append(district)
+    
+    if mo_id is not None:
+        mo_param_num = len(params) + 1
+        mo_filter_sql = f"AND a.id_mo = ${mo_param_num}"
+        params.append(mo_id)
+    
     latest_gas_records_query = f"""
         SELECT DISTINCT ON (gd.id_address) 
             gd.id_address, gd.id_type_address, gd.date_create, gd.from_login,
@@ -90,14 +103,11 @@ async def get_gazification_data(
             AND gd.deleted = false
             AND a.deleted = false
             AND a.house IS NOT NULL
-            {(f"AND a.id_mo = ${mo_param_num}" if mo_id is not None else "")}
+            {mo_filter_sql}
+            {district_filter_sql}
             {date_filter_sql}
         ORDER BY gd.id_address, gd.date_create DESC
     """
-    
-    # Добавляем параметр mo_id если нужно
-    if mo_id is not None:
-        params.append(mo_id)
     
     # Выполняем оптимизированный запрос
     connection = Tortoise.get_connection("default")
@@ -105,7 +115,7 @@ async def get_gazification_data(
     # Обрабатываем результаты запроса
     address_gas_info = {}
     gazification_status = {}
-    addresses = []
+    temp_addresses = []
     
     for item in combined_data:
         address_id = item["id_address"]
@@ -135,26 +145,38 @@ async def get_gazification_data(
             "date_create": date_create,
             "gas_from_login": from_login,
         }
-        addresses.append(address)
+        temp_addresses.append(address)
     
-    # Применяем фильтры по району и улице, если они заданы
-    if district or street:
+    # Если есть фильтр по district, удаляем дубликаты адресов, оставляя только с самыми свежими данными газификации
+    if district:
+        # Группируем адреса по ключу (mo_id, street, house, flat)
+        address_groups = {}
+        for address in temp_addresses:
+            key = (address["id_mo"], address["street"], address["house"], address["flat"])
+            if key not in address_groups:
+                address_groups[key] = []
+            address_groups[key].append(address)
+        
+        # Для каждой группы оставляем только адрес с самыми свежими данными газификации
+        addresses = []
+        for group in address_groups.values():
+            if len(group) == 1:
+                addresses.append(group[0])
+            else:
+                # Сортируем по дате создания данных газификации (самые свежие первыми)
+                group.sort(key=lambda x: x["date_create"], reverse=True)
+                addresses.append(group[0])
+    else:
+        addresses = temp_addresses
+    
+    # Применяем фильтр по улице, если он задан (district уже обработан в SQL)
+    if street:
         filtered_addresses = []
         for address in addresses:
-            if district:
-                normalized_district = district.strip().lower()
-                address_district = (address.get("district") or "").strip().lower()
-                address_city = (address.get("city") or "").strip().lower()
-                if not (address_district == normalized_district or address_city == normalized_district):
-                    continue
-            
-            if street:
-                normalized_street = street.strip().lower()
-                address_street = (address.get("street") or "").strip().lower()
-                if address_street != normalized_street:
-                    continue
-                    
-            filtered_addresses.append(address)
+            normalized_street = street.strip().lower()
+            address_street = (address.get("street") or "").strip().lower()
+            if address_street == normalized_street:
+                filtered_addresses.append(address)
         addresses = filtered_addresses
     # Получаем информацию о муниципалитетах
     mo_ids = {address["id_mo"] for address in addresses if address["id_mo"] is not None}
