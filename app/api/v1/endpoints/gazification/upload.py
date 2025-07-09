@@ -6,6 +6,7 @@ from app.schemas.gazification import GazificationUploadRequest
 from app.models.models import AddressV2, GazificationData, TypeValue
 from app.core.exceptions import DatabaseError, ValidationError
 from tortoise.transactions import in_transaction
+from tortoise.expressions import Q
 
 router = APIRouter()
 
@@ -26,9 +27,13 @@ async def upload_gazification_data(request: GazificationUploadRequest):
             deleted=False,
         )
         if request.address.district:
-            address_query = address_query.filter(district=request.address.district)
+            # Район может быть в поле district или city
+            address_query = address_query.filter(
+                Q(district=request.address.district) | Q(city=request.address.district)
+            )
         else:
-            address_query = address_query.filter(district__isnull=True)
+            # Если район не передан, ищем где оба поля NULL
+            address_query = address_query.filter(district__isnull=True, city__isnull=True)
         if request.address.flat:
             address_query = address_query.filter(flat=request.address.flat)
         else:
@@ -39,6 +44,7 @@ async def upload_gazification_data(request: GazificationUploadRequest):
                 address = await AddressV2.create(
                     id_mo=request.address.mo_id,
                     district=request.address.district,
+                    city=request.address.district,
                     street=request.address.street,
                     house=request.address.house,
                     flat=request.address.flat,
