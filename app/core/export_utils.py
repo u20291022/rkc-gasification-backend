@@ -93,7 +93,7 @@ async def get_gazification_data(
         params.append(mo_id)
     
     latest_gas_records_query = f"""
-        SELECT DISTINCT ON (gd.id_address) 
+        SELECT 
             gd.id_address, gd.id_type_address, gd.date_create, gd.from_login,
             a.id_mo, a.district, a.city, a.street, a.house, a.flat, a.from_login as address_from_login
         FROM s_gazifikacia.t_gazifikacia_data gd
@@ -106,7 +106,7 @@ async def get_gazification_data(
             {mo_filter_sql}
             {district_filter_sql}
             {date_filter_sql}
-        ORDER BY gd.id_address, gd.date_create DESC
+        ORDER BY gd.date_create DESC
     """
     
     # Выполняем оптимизированный запрос
@@ -119,6 +119,11 @@ async def get_gazification_data(
     
     for item in combined_data:
         address_id = item["id_address"]
+        
+        # Пропускаем, если уже обработали этот адрес (берем только самую свежую запись)
+        if address_id in address_gas_info:
+            continue
+            
         type_address = item["id_type_address"]
         date_create = item["date_create"]
         from_login = item["from_login"]
@@ -147,27 +152,24 @@ async def get_gazification_data(
         }
         temp_addresses.append(address)
     
-    # Если есть фильтр по district, удаляем дубликаты адресов, оставляя только с самыми свежими данными газификации
-    if district:
-        # Группируем адреса по ключу (mo_id, street, house, flat)
-        address_groups = {}
-        for address in temp_addresses:
-            key = (address["id_mo"], address["street"], address["house"], address["flat"])
-            if key not in address_groups:
-                address_groups[key] = []
-            address_groups[key].append(address)
-        
-        # Для каждой группы оставляем только адрес с самыми свежими данными газификации
-        addresses = []
-        for group in address_groups.values():
-            if len(group) == 1:
-                addresses.append(group[0])
-            else:
-                # Сортируем по дате создания данных газификации (самые свежие первыми)
-                group.sort(key=lambda x: x["date_create"], reverse=True)
-                addresses.append(group[0])
-    else:
-        addresses = temp_addresses
+    # Удаляем дубликаты адресов, оставляя только с самыми свежими данными газификации
+    # Группируем адреса по ключу (mo_id, street, house, flat)
+    address_groups = {}
+    for address in temp_addresses:
+        key = (address["id_mo"], address["street"], address["house"], address["flat"])
+        if key not in address_groups:
+            address_groups[key] = []
+        address_groups[key].append(address)
+    
+    # Для каждой группы оставляем только адрес с самыми свежими данными газификации
+    addresses = []
+    for group in address_groups.values():
+        if len(group) == 1:
+            addresses.append(group[0])
+        else:
+            # Сортируем по дате создания данных газификации (самые свежие первыми)
+            group.sort(key=lambda x: x["date_create"], reverse=True)
+            addresses.append(group[0])
     
     # Применяем фильтр по улице, если он задан (district уже обработан в SQL)
     if street:
