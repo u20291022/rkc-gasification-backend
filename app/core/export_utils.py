@@ -3,8 +3,9 @@ from tortoise.functions import Lower
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import date, datetime, timedelta
 from fastapi import HTTPException
-from app.models.models import AddressV2, TypeValue, FieldType, GazificationData, Municipality
+from app.models.models import AddressV2, TypeValue, FieldType, GazificationData, Municipality, TypeAddress
 from app.core.utils import log_db_operation
+from tortoise import Tortoise
 
 
 def parse_date(date_str, is_start=True):
@@ -60,7 +61,6 @@ async def get_gazification_data(
               ключ внутренний - id вопроса, значение - ответ"""
     # Оптимизированный запрос для получения последних записей по каждому адресу
     # Используем единый SQL запрос для получения всех данных сразу
-    from tortoise import Tortoise
     
     # Строим базовый фильтр для дат
     date_filter_sql = ""
@@ -180,6 +180,7 @@ async def get_gazification_data(
             if address_street == normalized_street:
                 filtered_addresses.append(address)
         addresses = filtered_addresses
+
     # Получаем информацию о муниципалитетах
     mo_ids = {address["id_mo"] for address in addresses if address["id_mo"] is not None}
     if mo_ids:
@@ -308,21 +309,251 @@ async def get_activity_data(
     return activities
 
 
-async def get_optimized_gazification_data(
+async def get_gazification_view_data(
     mo_id: Optional[int] = None,
     district: Optional[str] = None,
     street: Optional[str] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-    export_type: str = "excel",
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[int, Dict[int, str]]]:
+) -> List[Dict[str, Any]]:
     """
-    Оптимизированная функция получения данных о газификации
+    Получает данные для представления газификации на основе SQL view.
+    
+    Эта функция воспроизводит логику SQL представления v_gazifikacia_data_10_07_2025
+    для получения структурированных данных о газификации с разворачиванием ответов
+    на вопросы в отдельные колонки.
+    
+    Args:
+        mo_id: ID муниципалитета (опционально)
+        district: Название района (опционально) 
+        street: Название улицы (опционально)
+        date_from: Начальная дата для фильтрации (опционально)
+        date_to: Конечная дата для фильтрации (опционально)
+    
+    Returns:
+        List[Dict[str, Any]]: список записей с данными газификации и развернутыми ответами
     """
-    return await get_gazification_data(
-        mo_id=mo_id,
-        district=district,
-        street=street,
-        date_from=date_from,
-        date_to=date_to,
+    # Строим SQL запрос, воспроизводящий логику представления
+    connection = Tortoise.get_connection("default")
+    
+    # Собираем все параметры и условия в правильном порядке
+    params = []
+    where_conditions = []
+    
+    # Фильтры для дат газификации
+    if date_from:
+        params.append(date_from)
+        where_conditions.append(f"gd.date_create >= ${len(params)}")
+    
+    if date_to:
+        params.append(date_to)
+        where_conditions.append(f"gd.date_create <= ${len(params)}")
+    
+    date_filter_sql = ""
+    if where_conditions:
+        date_filter_sql = "AND " + " AND ".join(where_conditions)
+    
+    # Фильтры для адресов
+    address_where_conditions = []
+    
+    if mo_id is not None:
+        params.append(mo_id)
+        address_where_conditions.append(f"a.id_mo = ${len(params)}")
+    
+    if district:
+        params.append(district)
+        address_where_conditions.append(f"(LOWER(a.district) = LOWER(${len(params)}) OR LOWER(a.city) = LOWER(${len(params)}))")
+    
+    if street:
+        params.append(street)
+        address_where_conditions.append(f"LOWER(a.street) = LOWER(${len(params)})")
+    
+    address_filter_sql = ""
+    if address_where_conditions:
+        address_filter_sql = "AND " + " AND ".join(address_where_conditions)
+    
+    # Основной SQL запрос, основанный на представлении
+    query = f"""
+    WITH 
+    gazifikaciaexport_0 as (
+        SELECT *
+        FROM s_gazifikacia.t_gazifikacia_data gd
+        WHERE 
+            gd.id_type_address IS NOT NULL
+            AND gd.is_mobile = true 
+            AND gd.deleted = false
+            {date_filter_sql}
+    ),
+    addressexport_0 as (
+        SELECT *
+        FROM s_gazifikacia.t_address_v2 a
+        WHERE 
+            a.deleted = false
+            AND a.house IS NOT NULL
+            {address_filter_sql}
+    ),
+    addressexport_1 as (
+        SELECT *
+        FROM addressexport_0 a
+        WHERE id in (   
+            SELECT id
+            FROM (
+                SELECT id,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY id_mo, street, house, flat
+                        ORDER BY date_create DESC
+                    ) AS rn
+                FROM addressexport_0 a3
+            ) a1
+            WHERE a1.rn = 1
+        )
+    ),
+    _gazifikacia AS (
+        SELECT gd.id,
+            gd.id_address,
+            gd.id_type_address,
+            gd.id_type_value,
+            gd.value,
+            gd.date_doc,
+            gd.date_create,
+            gd.date,
+            gd.is_mobile,
+            gd.from_login,
+            gd.deleted
+        FROM gazifikaciaexport_0 gd
+    ), 
+    _address AS (
+        SELECT a.id,
+            a.id_mo,
+            a.city,
+            a.street,
+            a.house,
+            a.flat,
+            a.district,
+            a.id_parent,
+            a.mkd,
+            a.is_mobile,
+            a.date_create,
+            a.from_login,
+            a.deleted
+        FROM addressexport_1 a
+    ), 
+    latest_gas_records AS (
+        SELECT *
+        FROM (
+            SELECT gd.id_address,
+                gd.id_type_address,
+                gd.date_create,
+                gd.from_login AS gas_from_login,
+                gd.is_mobile,
+                a.id_mo,
+                a.district,
+                a.city,
+                CASE
+                    WHEN a.street = 'Нет улиц' THEN ''
+                    ELSE COALESCE(a.street, '')
+                END AS street,
+                a.house,
+                COALESCE(a.flat, '') AS flat,
+                a.from_login AS address_from_login,
+                COALESCE(m.name, 'Неизвестный муниципалитет') AS mo_name,
+                row_number() OVER (PARTITION BY gd.id_address ORDER BY gd.date_create DESC) AS rn
+            FROM _gazifikacia gd
+            JOIN _address a ON gd.id_address = a.id
+            LEFT JOIN sp_s_subekty.v_all_name_mo m ON a.id_mo = m.id
+            WHERE (gd.id_type_address = ANY (ARRAY[3, 4, 6, 7])) 
+            AND a.house IS NOT null
+        ) t
+        WHERE t.rn = 1
+    ), 
+    latest_answers AS (
+        SELECT DISTINCT ON (gd.id_address, gd.id_type_value) 
+            gd.id_address,
+            gd.id_type_value,
+            gd.value
+        FROM _gazifikacia gd
+        WHERE gd.id_type_value IS NOT NULL
+        ORDER BY gd.id_address, gd.id_type_value, gd.date_create DESC
+    ), 
+    pivot_answers AS (
+        SELECT g.id_address,
+            max(CASE WHEN g.id_type_value = 0 THEN g.value ELSE NULL END) AS date,
+            max(CASE WHEN g.id_type_value = 1 THEN g.value ELSE NULL END) AS podal_zaivku,
+            max(CASE WHEN g.id_type_value = 2 THEN g.value ELSE NULL END) AS doc_na_domovladenie,
+            max(CASE WHEN g.id_type_value = 3 THEN g.value ELSE NULL END) AS doc_na_zem_ych,
+            max(CASE WHEN g.id_type_value = 4 THEN g.value ELSE NULL END) AS est_otdeln_zjil_pomech,
+            max(CASE WHEN g.id_type_value = 5 THEN g.value ELSE NULL END) AS soc_potderhka,
+            max(CASE WHEN g.id_type_value = 6 THEN g.value ELSE NULL END) AS proinformirovan_new_ystr,
+            max(CASE WHEN g.id_type_value = 7 THEN g.value ELSE NULL END) AS proinformirovan_new_org,
+            max(CASE WHEN g.id_type_value = 8 THEN g.value ELSE NULL END) AS planiryet_podkluchits,
+            max(CASE WHEN g.id_type_value = 9 THEN g.value ELSE NULL END) AS prichina,
+            max(CASE WHEN g.id_type_value = 10 THEN g.value ELSE NULL END) AS buklet_s_kontaktami,
+            max(CASE WHEN g.id_type_value = 11 THEN g.value ELSE NULL END) AS tekychi_sposob_otoplenia,
+            max(CASE WHEN g.id_type_value = 12 THEN g.value ELSE NULL END) AS prichina_nehelania,
+            max(CASE WHEN g.id_type_value = 13 THEN g.value ELSE NULL END) AS sposob_otoplenia
+        FROM latest_answers g
+        GROUP BY g.id_address
     )
+    SELECT lgr.id_address,
+        lgr.id_mo,
+        lgr.mo_name AS name_mo,
+        lgr.city,
+        lgr.street,
+        lgr.house,
+        lgr.flat,
+        lgr.district,
+        to_char(lgr.date_create, 'DD.MM.YYYY HH24:MI') AS date_doc,
+        lgr.id_type_address,
+        tta.type_address,
+        lgr.is_mobile,
+        pa.date,
+        pa.podal_zaivku,
+        pa.doc_na_domovladenie,
+        pa.doc_na_zem_ych,
+        pa.est_otdeln_zjil_pomech,
+        pa.soc_potderhka,
+        pa.proinformirovan_new_ystr,
+        pa.proinformirovan_new_org,
+        pa.planiryet_podkluchits,
+        pa.prichina,
+        pa.buklet_s_kontaktami,
+        pa.tekychi_sposob_otoplenia,
+        pa.prichina_nehelania,
+        pa.sposob_otoplenia
+    FROM latest_gas_records lgr
+    LEFT JOIN pivot_answers pa ON lgr.id_address = pa.id_address
+    LEFT JOIN s_gazifikacia.t_type_address tta ON tta.id = lgr.id_type_address
+    ORDER BY lgr.id_mo, lgr.district, lgr.street, lgr.house, lgr.flat
+    """
+    
+    # Выполняем запрос
+    result = await connection.execute_query_dict(query, params)
+    
+    # Нормализуем данные и преобразуем boolean значения
+    for row in result:
+        # Преобразуем boolean значения в читаемый формат
+        for field in ["podal_zaivku", "doc_na_domovladenie", "doc_na_zem_ych", 
+                     "est_otdeln_zjil_pomech", "soc_potderhka", "proinformirovan_new_ystr",
+                     "proinformirovan_new_org", "planiryet_podkluchits", "buklet_s_kontaktami"]:
+            value = row.get(field)
+            if value and value.lower() == "true":
+                row[field] = "Да"
+            elif value and value.lower() == "false":
+                row[field] = "Нет"
+            elif not value:
+                row[field] = ""
+    
+    log_db_operation(
+        "read",
+        "gazification_view_data",
+        {
+            "mo_id": mo_id,
+            "district": district,
+            "street": street,
+            "date_from": date_from.isoformat() if date_from else None,
+            "date_to": date_to.isoformat() if date_to else None,
+            "records_count": len(result),
+        },
+    )
+    
+    return result

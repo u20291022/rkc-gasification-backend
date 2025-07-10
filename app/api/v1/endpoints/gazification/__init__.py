@@ -10,6 +10,7 @@ from app.api.v1.endpoints.gazification import (
     type_values,
     update_gas_status,
     export_excel,
+    export_csv,
     export_activity,
     auth,
 )
@@ -25,5 +26,6 @@ router.include_router(update_gas_status.router)
 router.include_router(upload.router)
 router.include_router(type_values.router)
 router.include_router(export_excel.router)
+router.include_router(export_csv.router)
 router.include_router(export_activity.router)
 router.include_router(auth.router, prefix="/auth", tags=["authentication"])

@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 from app.core.utils import create_response, log_db_operation
 from app.schemas.base import BaseResponse
 from app.core.exceptions import DatabaseError
-from app.core.export_utils import get_optimized_gazification_data, parse_date
+from app.core.export_utils import get_gazification_data, parse_date
 from typing import Optional
 from datetime import datetime, timedelta
 import pandas as pd
@@ -36,8 +36,8 @@ async def export_to_excel(
     try:
         dt_from = parse_date(date_from, is_start=True)
         dt_to = parse_date(date_to, is_start=False)
-        addresses, questions, answers = await get_optimized_gazification_data(
-            mo_id, district, street, dt_from, dt_to, "excel"
+        addresses, questions, answers = await get_gazification_data(
+            mo_id, district, street, dt_from, dt_to
         )
 
         if not addresses:
