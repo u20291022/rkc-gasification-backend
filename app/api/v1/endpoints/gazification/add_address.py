@@ -47,6 +47,8 @@ async def add_address(request: AddressCreateRequest):
                     message=f"Адрес уже существует в базе данных"
                 )
             
+            current_time = datetime.now()
+            
             address = await AddressV2.create(
                 id_mo=request.mo_id,
                 district=district,
@@ -56,6 +58,7 @@ async def add_address(request: AddressCreateRequest):
                 flat=flat,
                 is_mobile=True,
                 from_login=request.from_login,
+                date_create=current_time,
             )
             id_type_address = 3 if request.has_gas else 4
             await GazificationData.create(
@@ -63,6 +66,7 @@ async def add_address(request: AddressCreateRequest):
                 id_type_address=id_type_address,
                 is_mobile=True,
                 from_login=request.from_login,
+                date_create=current_time,
             )
             log_db_operation(
                 "create",
