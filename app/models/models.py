@@ -31,6 +31,7 @@ class AddressV2(models.Model):
     id_parent = fields.IntField(null=True)
     mkd = fields.BooleanField(default=False)
     is_mobile = fields.BooleanField(default=False)
+    # date_create = fields.DatetimeField(auto_now_add=True)
     from_login = fields.TextField(null=True)
     deleted = fields.BooleanField(default=False)
 
@@ -54,6 +55,17 @@ class TypeValue(models.Model):
         table = "t_type_value"
 
 
+class TypeAddress(models.Model):
+    """Модель для типов адресов"""
+
+    id = fields.IntField(primary_key=True)
+    type_address = fields.CharField(max_length=128, null=True)
+
+    class Meta:
+        schema = "s_gazifikacia"
+        table = "t_type_address"
+
+
 class GazificationData(models.Model):
     """Модель для данных о газификации"""
 
@@ -62,8 +74,9 @@ class GazificationData(models.Model):
     id_type_address = fields.IntField(null=False)
     id_type_value = fields.IntField(null=True)
     value = fields.CharField(max_length=256, null=True)
+    date_doc = fields.DateField(null=True)
     date = fields.DateField(null=True)
-    date_create = fields.DatetimeField(auto_now_add=True)
+    # date_create = fields.DatetimeField(auto_now_add=True)
     is_mobile = fields.BooleanField(default=False)
     from_login = fields.TextField(null=True)
     deleted = fields.BooleanField(default=False)
@@ -129,22 +142,7 @@ class Activity(models.Model):
     session_id = fields.CharField(max_length=255, pk=True)
     email = fields.TextField(null=False)
     activity_count = fields.IntField(default=0)
-    date_create = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
         schema = "s_gazifikacia"
         table = "activity"
-
-
-class ExportLog(models.Model):
-    """Модель для отслеживания выгрузок данных"""
-
-    export_log_id = fields.IntField(pk=True)
-    export_type = fields.CharField(max_length=50, null=False)  # 'excel', 'bot_export'
-    last_export_date = fields.DatetimeField(null=False)
-    exported_by = fields.CharField(max_length=255, null=True)  # email или bot_id
-    created_at = fields.DatetimeField(auto_now_add=True)
-
-    class Meta:
-        schema = "s_gazifikacia"
-        table = "export_log"
