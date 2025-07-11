@@ -161,7 +161,7 @@ async def export_gazification_to_csv(
 
         # Возвращаем CSV как streaming response
         def iter_csv():
-            yield csv_content.encode('utf-8-sig')  # BOM для корректного отображения в Excel
+            yield csv_content.encode('utf-8')  # UTF-8 без BOM для корректного отображения кириллицы
             
         return StreamingResponse(
             iter_csv(),
