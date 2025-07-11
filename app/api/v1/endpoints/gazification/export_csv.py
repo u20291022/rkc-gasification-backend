@@ -155,7 +155,7 @@ async def export_gazification_to_csv(
                 "date_to": date_to,
                 "records_count": len(data),
                 "client_source": client_source,
-                "filename": filename
+                "export_filename": filename
             },
         )
 
