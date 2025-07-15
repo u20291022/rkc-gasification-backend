@@ -137,11 +137,15 @@ async def get_gazification_data(
         gazification_status[address_id] = type_address
         
         # Формируем информацию об адресе
+        # Объединяем district и city в одно поле для корректного определения района
+        district_value = item["district"] or item["city"] or ""
+        city_value = item["city"] or item["district"] or ""
+        
         address = {
             "id": address_id,
             "id_mo": item["id_mo"],
-            "district": item["district"],
-            "city": item["city"],
+            "district": district_value,
+            "city": city_value,
             "street": item["street"] if item["street"] != "Нет улиц" else "",
             "house": item["house"],
             "flat": item["flat"] or "",
@@ -153,10 +157,10 @@ async def get_gazification_data(
         temp_addresses.append(address)
     
     # Удаляем дубликаты адресов, оставляя только с самыми свежими данными газификации
-    # Группируем адреса по ключу (mo_id, street, house, flat)
+    # Группируем адреса по ключу (mo_id, district, street, house, flat)
     address_groups = {}
     for address in temp_addresses:
-        key = (address["id_mo"], address["street"], address["house"], address["flat"])
+        key = (address["id_mo"], address["district"], address["street"], address["house"], address["flat"])
         if key not in address_groups:
             address_groups[key] = []
         address_groups[key].append(address)
@@ -400,7 +404,7 @@ async def get_gazification_view_data(
             FROM (
                 SELECT id,
                     ROW_NUMBER() OVER (
-                        PARTITION BY id_mo, street, house, flat
+                        PARTITION BY id_mo, COALESCE(district, city, ''), street, house, flat
                         ORDER BY date_create DESC
                     ) AS rn
                 FROM addressexport_0 a3
@@ -447,8 +451,8 @@ async def get_gazification_view_data(
                 gd.from_login AS gas_from_login,
                 gd.is_mobile,
                 a.id_mo,
-                a.district,
-                a.city,
+                COALESCE(a.district, a.city, '') AS district,
+                COALESCE(a.city, a.district, '') AS city,
                 CASE
                     WHEN a.street = 'Нет улиц' THEN ''
                     ELSE COALESCE(a.street, '')
